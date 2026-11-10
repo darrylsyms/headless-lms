@@ -5,6 +5,7 @@ import { ThemeProvider } from "next-themes";
 import "./globals.css";
 import { AppProvider } from "@/lib/store";
 import { Toast } from "@/components/primitives/toast";
+import { PortalShell } from "@/components/fretwise/portal-shell";
 
 // Self-hosted Pretendard variable font (best practice: no FOUT, no layout shift).
 const pretendard = localFont({
@@ -32,7 +33,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
           disableTransitionOnChange
         >
           <AppProvider>
-            {children}
+            <PortalShell>{children}</PortalShell>
             <Toast />
           </AppProvider>
         </ThemeProvider>

@@ -19,3 +19,11 @@ Object storage and outgoing email are not configured. Test emails are written to
 5. Before migration, verify historical completion and comment import, customer identity, WordPress metadata mappings, subscription changes and reconciliation. None is implemented here.
 
 The supplied apps and their UI are upstream defaults. Vimeo embed behaviour, feed modelling, historical imports and a WooCommerce/WordPress integration still require investigation and implementation. This repository is an evaluation starting point; it is not ready for customers or production deployment.
+
+## Fretwise customisations and upstream updates
+
+The checkout keeps `upstream` pointing to Headless LMS. The first commit in this checkout is shallow; fetch full history before attempting to merge upstream (`git fetch --unshallow upstream` once, then `git fetch upstream`). Review upstream release and migration notes, back up the local database, and test an update on a separate branch before merging. Upstream updates can change APIs, environment variables and database migrations; compatibility cannot be assumed.
+
+Fretwise-specific navigation lives in `apps/student/src/components/fretwise/portal-shell.tsx`; it is attached by a small change to the upstream root layout. The Insider and community pages are additions under `apps/student/src/app`. The community preview uses the current LMS API and is read-only. It needs `FRETWISE_COMMUNITY_ID` in `apps/student/.env.local`, set to the community ID for this local installation. It does not enumerate multiple communities. Do not commit local IDs or secrets. Course type links use the category field of the signed-in student’s accessible courses. The Insider Feed itself is not implemented yet.
+
+The course library lists grants, even for an organisation owner. Publishing a course alone does not grant it to an account. Use a separate test student, grant that student access in the course's Access tab, then sign into the student portal as that student. Admin and student apps share a localhost session cookie, so use a separate browser profile for simultaneous testing. Community access is also controlled by a grant, although staff with community-read permission can preview it.

@@ -38,8 +38,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
 
   const view = parseDashboardParams(sp);
   const totals = countByState(views);
-  const hero = pickHero(views);
-  const visible = sortCourses(filterCourses(views, view.filter), view.sort);
+  const category = typeof sp.category === "string" ? sp.category : undefined;
+  const categorized = category ? views.filter((item) => item.course.category === category) : views;
+  const hero = pickHero(categorized);
+  const visible = sortCourses(filterCourses(categorized, view.filter), view.sort);
 
   return (
     <>
@@ -59,6 +61,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
 
         {hero && <ContinueHero {...hero} />}
 
+        {category && <h2 className="text-xl font-semibold">{category}</h2>}
         <Toolbar {...view} />
 
         <CourseCollection
