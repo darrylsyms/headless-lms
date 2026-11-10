@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Content } from "@headless-lms/sdk";
+import { listVisibleCourses } from "@/lib/api/visible-courses";
 import { ensureClientSdk } from "@/lib/api/client-sdk";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -22,7 +22,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
     if (isAuthPage) return;
     let current = true;
     ensureClientSdk();
-    Content.listMemberCourses()
+    listVisibleCourses()
       .then((courses) => {
         if (current)
           setCategories(

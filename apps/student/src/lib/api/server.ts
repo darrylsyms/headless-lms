@@ -15,6 +15,7 @@ import { Content, Organizations, Progress } from "@headless-lms/sdk";
 
 import { statusOf } from "./shared";
 import { authHeaders } from "./server-call";
+import { listVisibleCourses } from "./visible-courses";
 import type {
   Activity,
   Course,
@@ -50,7 +51,7 @@ async function orNull<T>(read: () => Promise<T>): Promise<T | null> {
 
 export const memberApi = {
   async listCourses(): Promise<CourseSummary[]> {
-    return await Content.listMemberCourses(await authHeaders());
+    return await listVisibleCourses(await authHeaders());
   },
   async org(): Promise<Org> {
     return await Organizations.getMemberOrg(await authHeaders());
