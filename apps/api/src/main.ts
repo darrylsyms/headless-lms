@@ -29,7 +29,9 @@ const container = await createContainer(config, {
       : emailConfig && new ResendEmailAdapter(emailConfig),
     storage: new MinioStorageAdapter(loadStorageConfig()),
     templates: new ReactEmailTemplateRenderer(),
-    workflows: (logger) => new HatchetAutomationEngine(undefined, logger),
+    workflows: process.env.HATCHET_CLIENT_TOKEN
+      ? (logger) => new HatchetAutomationEngine(undefined, logger)
+      : undefined,
     push: pushConfig,
     pushSender: new PushAdapter(pushConfig),
     pubsub: (logger) => new PostgresPubSub({ connectionString: config.pubsubDatabaseUrl, logger }),
