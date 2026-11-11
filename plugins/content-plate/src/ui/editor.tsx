@@ -65,7 +65,7 @@ export function EditorContainer({
 const editorVariants = cva(
   cn(
     "group/editor pt-4",
-    "relative w-full overflow-x-hidden whitespace-pre-wrap break-words",
+    "relative w-full overflow-x-visible whitespace-pre-wrap break-words",
     "rounded-md ring-offset-background placeholder:text-muted-foreground/80 focus-visible:outline-hidden",
     "**:data-slate-placeholder:!top-1/2 **:data-slate-placeholder:-translate-y-1/2 **:data-slate-placeholder:text-muted-foreground/80 **:data-slate-placeholder:opacity-100!",
     "[&_strong]:font-bold",

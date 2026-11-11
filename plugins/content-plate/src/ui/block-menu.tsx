@@ -15,6 +15,7 @@ import {
   FilesIcon,
   PaintRoller,
   RefreshCwIcon,
+  Replace,
   Trash2,
 } from "lucide-react";
 import { KEYS, type TElement } from "platejs";
@@ -26,6 +27,8 @@ import { backgroundColorItems, ColorIcon, textColorItems } from "./font-color-to
 import { turnIntoItems } from "./turn-into-toolbar-button";
 
 import { Input } from "./input";
+import { useOpenMediaSource } from "./media-source-button";
+import { mediaSourceTarget } from "./media-source";
 import {
   type Action,
   ComboboxContent,
@@ -68,6 +71,7 @@ export function BlockMenu({
         if (!open) {
           editor.getApi(BlockMenuPlugin).blockMenu.hide();
         } else if (id) {
+          editor.getApi(BlockSelectionPlugin).blockSelection.set(id);
           editor.getApi(BlockMenuPlugin).blockMenu.show(id);
         }
       }}
@@ -95,7 +99,7 @@ export function BlockMenu({
         <ComboboxList>
           <ComboboxEmpty />
 
-          <BlockMenuItems />
+          <BlockMenuItems blockId={id} />
         </ComboboxList>
       </MenuContent>
     </Menu>
@@ -154,6 +158,13 @@ const GROUP = {
 } as const;
 
 export const blockMenuItems = {
+  replace: {
+    icon: <Replace />,
+    keywords: ["change", "source", "media", "image", "video", "audio", "file"],
+    label: "Replace media",
+    value: "replace",
+    focusEditor: false,
+  },
   caption: {
     icon: <CaptionsIcon />,
     keywords: ["alt"],
@@ -237,7 +248,7 @@ const orderedMenuItems = [
 
 const mediaMenuItems = [
   {
-    items: [blockMenuItems.caption],
+    items: [blockMenuItems.replace, blockMenuItems.caption],
   },
   {
     items: [blockMenuItems[GROUP.ALIGN]],
@@ -247,24 +258,36 @@ const mediaMenuItems = [
   },
 ];
 
-function BlockMenuItems() {
+function BlockMenuItems({ blockId }: { blockId?: string }) {
   const [searchValue] = useComboboxValueState();
   const selectedBlocks = useBlockSelectionNodes();
   const editor = useEditorRef();
+  const openMediaSource = useOpenMediaSource();
+  const clickedBlock = blockId ? editor.api.node({ id: blockId, at: [] })?.[0] : undefined;
+  const targetBlock =
+    clickedBlock ?? (selectedBlocks.length === 1 ? selectedBlocks[0][0] : undefined);
+  const replaceTarget = mediaSourceTarget(targetBlock as TElement | undefined);
 
   const menuGroups = useMemo(() => {
     const isMedia =
-      selectedBlocks.length === 1 &&
-      selectedBlocks.some((item) =>
-        [KEYS.audio, KEYS.file, KEYS.img, KEYS.mediaEmbed, KEYS.video].includes(
-          item[0].type as any,
-        ),
+      !!targetBlock &&
+      [KEYS.audio, KEYS.file, KEYS.img, KEYS.mediaEmbed, KEYS.video].some(
+        (type) => type === targetBlock.type,
       );
 
-    const items = isMedia ? mediaMenuItems : orderedMenuItems;
+    const items = isMedia
+      ? targetBlock?.type === KEYS.mediaEmbed
+        ? mediaMenuItems.map((group) => ({
+            ...group,
+            items: group.items.filter((item) => item.value !== "replace"),
+          }))
+        : mediaMenuItems
+      : replaceTarget
+        ? [{ items: [blockMenuItems.replace] }, ...orderedMenuItems]
+        : orderedMenuItems;
 
     return filterMenuGroups(items, searchValue) || items;
-  }, [selectedBlocks, searchValue]);
+  }, [targetBlock, replaceTarget, searchValue]);
 
   return (
     <>
@@ -290,8 +313,12 @@ function BlockMenuItems() {
               <MenuItem
                 icon={menuItem.icon}
                 key={item.value}
-                label={menuItem.label}
+                label={item.value === "replace" && replaceTarget ? `Replace ${replaceTarget.type === KEYS.img ? "image" : replaceTarget.type}` : menuItem.label}
                 onClick={() => {
+                  if (item.value === "replace") {
+                    if (replaceTarget) openMediaSource(replaceTarget);
+                    return;
+                  }
                   menuItem.onSelect?.({ editor });
 
                   if (menuItem.focusEditor !== false) editor.tf.focus();

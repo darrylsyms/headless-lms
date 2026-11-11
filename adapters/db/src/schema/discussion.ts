@@ -295,6 +295,30 @@ export const comments = pgTable(
   }),
 );
 
+export const commentRequests = pgTable(
+  "comment_requests",
+  {
+    orgId: text("org_id").notNull(),
+    orgUserId: text("org_user_id").notNull(),
+    clientId: uuid("client_id").notNull(),
+    activityId: text("activity_id").notNull(),
+    parentId: text("parent_id"),
+    bodyHash: text("body_hash").notNull(),
+    commentId: text("comment_id").notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.orgId, t.orgUserId, t.clientId] }),
+    orgUserFk: foreignKey({
+      columns: [t.orgId, t.orgUserId],
+      foreignColumns: [orgUsers.orgId, orgUsers.id],
+    }).onDelete("cascade"),
+    activityFk: foreignKey({
+      columns: [t.orgId, t.activityId],
+      foreignColumns: [activities.orgId, activities.id],
+    }).onDelete("cascade"),
+  }),
+);
+
 export const commentReactions = pgTable(
   "comment_reactions",
   {

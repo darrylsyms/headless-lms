@@ -16,7 +16,13 @@ import type {
   Page,
   ReactionEmoji,
 } from "@headless-lms/core/types";
-import { commentFlags, commentReactions, comments, posts } from "../schema/index.js";
+import {
+  commentFlags,
+  commentReactions,
+  commentRequests,
+  comments,
+  posts,
+} from "../schema/index.js";
 import { activities } from "../schema/content.js";
 import { orgUsers } from "../schema/organizations.js";
 import { userProfiles, users } from "../schema/identity.js";
@@ -83,6 +89,38 @@ export class DrizzleDiscussionRepository implements DiscussionRepository {
       })
       .returning();
     return toComment(row!);
+  }
+
+  async claimCommentRequest(orgId: string, comment: Comment, clientId: string, bodyHash: string) {
+    if (!comment.activityId) {throw new Error("Activity required");}
+    const values = {
+      orgId,
+      orgUserId: comment.orgUserId,
+      clientId,
+      activityId: comment.activityId,
+      parentId: comment.parentId,
+      bodyHash,
+      commentId: comment.id,
+    };
+    const [inserted] = await this.db
+      .insert(commentRequests)
+      .values(values)
+      .onConflictDoNothing()
+      .returning();
+    if (inserted) {return { ...inserted, created: true };}
+    const [existing] = await this.db
+      .select()
+      .from(commentRequests)
+      .where(
+        and(
+          eq(commentRequests.orgId, orgId),
+          eq(commentRequests.orgUserId, comment.orgUserId),
+          eq(commentRequests.clientId, clientId),
+        ),
+      )
+      .limit(1);
+    if (!existing) {throw new Error("Comment request unavailable");}
+    return { ...existing, created: false };
   }
 
   async findComment(orgId: string, id: string): Promise<Comment | null> {

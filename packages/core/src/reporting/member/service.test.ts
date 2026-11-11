@@ -128,7 +128,10 @@ function fakeContent(
 }
 
 const fileUrls = createFileUrls('https://api.test', (key) => `https://cdn.test/${key}`);
-const files = { signFile: async (_orgId: string, assetId: string) => `https://signed/${assetId}` };
+const files = {
+  signFile: async (_orgId: string, assetId: string) => `https://signed/${assetId}`,
+  readyFiles: async () => ({}),
+};
 
 const readers: Pick<
   MemberReportServiceParams,
@@ -213,6 +216,7 @@ function fakeContentService(over: Partial<ContentServicePort> = {}): ContentServ
     updateModule: rejectMutation,
     deleteModule: rejectMutation,
     reorderActivities: rejectMutation,
+    moveActivity: rejectMutation,
     saveActivity: rejectMutation,
     deleteActivity: rejectMutation,
     listDownloads: async () => ({ rows: [], total: 0, page: 1, pageSize: 20 }),
@@ -786,6 +790,13 @@ describe('serving files', () => {
       progress: fakeProgress([]),
       ...deps,
       files: {
+        readyFiles: async (_o, ids) =>
+          Object.fromEntries(
+            ids.map((id) => [
+              id,
+              { filename: 'Practice notes.pdf', contentType: 'application/pdf', size: 10 },
+            ]),
+          ),
         signFile: async (_o, assetId, opts) => {
           signed.push({ assetId, ...(opts?.saveAs ? { saveAs: opts.saveAs } : {}) });
           return `https://signed/${assetId}`;
@@ -805,6 +816,20 @@ describe('serving files', () => {
     const { svc, signed } = build();
     expect(await svc.activityFile('a1', 'ast_video', student)).toBe('https://signed/ast_video');
     expect(signed).toEqual([{ assetId: 'ast_video' }]);
+  });
+
+  it('downloads an attached lesson file using its stored filename', async () => {
+    const { svc, signed } = build();
+    expect(await svc.activityFile('a1', 'ast_video', student, true)).toBe(
+      'https://signed/ast_video',
+    );
+    expect(signed).toEqual([{ assetId: 'ast_video', saveAs: 'Practice notes.pdf' }]);
+    await expect(
+      build({ grants: [] }).svc.activityFile('a1', 'ast_video', student, true),
+    ).rejects.toThrow(NotFoundError);
+    await expect(build().svc.activityFile('a1', 'ast_other', student, true)).rejects.toThrow(
+      NotFoundError,
+    );
   });
 
   it('refuses a lesson file without access, unlinked, in a draft lesson or course, but lets staff through', async () => {

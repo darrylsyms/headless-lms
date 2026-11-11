@@ -174,7 +174,26 @@ export function fakeRepo() {
     };
   }
 
+  const requests = new Map<
+    string,
+    { commentId: string; activityId: string; parentId: string | null; bodyHash: string }
+  >();
   const repo: DiscussionRepository = {
+    async claimCommentRequest(orgId, comment, clientId, bodyHash) {
+      const key = `${orgId}:${comment.orgUserId}:${clientId}`;
+      const prior = requests.get(key);
+      if (prior) {
+        return { ...prior, created: false };
+      }
+      const item = {
+        commentId: comment.id,
+        activityId: comment.activityId!,
+        parentId: comment.parentId,
+        bodyHash,
+      };
+      requests.set(key, item);
+      return { ...item, created: true };
+    },
     async insertComment(_orgId, comment) {
       comments.push({ ...comment });
       return comment;
@@ -592,6 +611,25 @@ describe('post', () => {
     expect(appended.map((e) => e.type)).toEqual(['discussion.comment.created']);
   });
 
+  it('returns one comment and emits one event for a retried request', async () => {
+    const { service, appended } = await openCourse();
+    const input = {
+      activityId: 'a1',
+      parentId: null,
+      body: 'hello',
+      clientId: 'same-client-request',
+    };
+    const first = await service.postComment(input, learner);
+    const repeated = await service.postComment(input, learner);
+    expect(repeated.id).toBe(first.id);
+    expect(appended.map((event) => event.type)).toEqual(['discussion.comment.created']);
+    await expect(
+      service.postComment({ ...input, body: 'different' }, learner),
+    ).rejects.toBeInstanceOf(ConflictError);
+    const otherPerson = await service.postComment(input, other);
+    expect(otherPerson.id).not.toBe(first.id);
+  });
+
   it('refuses to post when the activity has comments switched off', async () => {
     const { service, activitySettings } = await openCourse();
     setActivityComments(activitySettings, 'a1', 'never');
@@ -630,7 +668,7 @@ describe('post', () => {
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
-  it('refuses to nest a reply below a reply', async () => {
+  it('stores the exact parent of a lesson reply and returns it in the thread', async () => {
     const { service } = await openCourse();
     const root = await service.postComment(
       { activityId: 'a1', parentId: null, body: 'root' },
@@ -640,9 +678,13 @@ describe('post', () => {
       { activityId: 'a1', parentId: root.id, body: 'reply' },
       learner,
     );
-    await expect(
-      service.postComment({ activityId: 'a1', parentId: reply.id, body: 'deeper' }, learner),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    const nested = await service.postComment(
+      { activityId: 'a1', parentId: reply.id, body: 'deeper' },
+      learner,
+    );
+    expect(nested.parentId).toBe(reply.id);
+    const thread = await service.activityComments('a1', learner);
+    expect(thread.comments.find((comment) => comment.id === nested.id)?.parentId).toBe(reply.id);
   });
 
   it('refuses a reply to a comment on another activity', async () => {
@@ -763,6 +805,28 @@ describe('activityComments', () => {
     const placeholder = comments.find((c) => c.id === root.id);
     expect(placeholder?.body).toBeNull();
     expect(placeholder?.removedBy?.id).toBe(staff.id);
+  });
+
+  it('retains removed ancestors as placeholders for visible nested replies', async () => {
+    const { service } = await openCourse();
+    const root = await service.postComment(
+      { activityId: 'a1', parentId: null, body: 'root' },
+      learner,
+    );
+    const child = await service.postComment(
+      { activityId: 'a1', parentId: root.id, body: 'child' },
+      other,
+    );
+    const grandchild = await service.postComment(
+      { activityId: 'a1', parentId: child.id, body: 'grandchild' },
+      learner,
+    );
+    await service.remove(root.id, 'any', staff);
+    await service.remove(child.id, 'any', staff);
+    const { comments } = await service.activityComments('a1', other);
+    expect(comments.find((comment) => comment.id === root.id)?.body).toBeNull();
+    expect(comments.find((comment) => comment.id === child.id)?.body).toBeNull();
+    expect(comments.find((comment) => comment.id === grandchild.id)?.parentId).toBe(child.id);
   });
 
   it('signs the author and remover photos on every comment view', async () => {

@@ -107,6 +107,24 @@ export async function memberNotificationRoutes(
   });
 
   r.route({
+    method: 'DELETE',
+    url: '/api/member/notifications/:notificationId/read',
+    preHandler: app.requireOrgSession,
+    schema: {
+      operationId: 'markMemberNotificationUnread',
+      tags,
+      summary: 'Mark one of your notifications unread',
+      description: 'For any member of the organization. Returns 404 when the notification is not yours.',
+      params: NotificationIdParam,
+      response: { 204: z.void(), ...refusals(403, 404) },
+    },
+    handler: async (req, reply) => {
+      await container.notificationList.markUnread(req.params.notificationId, await memberOf(req));
+      return reply.code(204).send();
+    },
+  });
+
+  r.route({
     method: 'POST',
     url: '/api/member/notifications/read',
     preHandler: app.requireOrgSession,

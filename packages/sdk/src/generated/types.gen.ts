@@ -15593,7 +15593,7 @@ export type CreatePostCommentData = {
   body: {
     body: string;
     /**
-     * The comment this replies to. Replies nest one level, under a root comment
+     * The comment this replies to
      */
     parentId?: string | null;
   };
@@ -18924,9 +18924,10 @@ export type PostCommentData = {
   body: {
     body: string;
     /**
-     * The comment this replies to. Replies nest one level, under a root comment
+     * The comment this replies to
      */
     parentId?: string | null;
+    clientId?: string;
   };
   path: {
     activityId: string;
@@ -22560,6 +22561,69 @@ export type GetActivityFileErrors = {
 
 export type GetActivityFileError = GetActivityFileErrors[keyof GetActivityFileErrors];
 
+export type DownloadActivityFileData = {
+  body?: never;
+  path: {
+    activityId: string;
+    assetId: string;
+  };
+  query?: never;
+  url: "/api/member/activities/{activityId}/assets/{assetId}/download";
+};
+
+export type DownloadActivityFileErrors = {
+  /**
+   * Default Response
+   */
+  400: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    issues?: Array<{
+      /**
+       * Where in the request, such as `body.topics[1].name`
+       */
+      path: string;
+      message: string;
+    }>;
+  };
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  404: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type DownloadActivityFileError =
+  DownloadActivityFileErrors[keyof DownloadActivityFileErrors];
+
 export type GetDownloadFileData = {
   body?: never;
   path: {
@@ -23292,6 +23356,75 @@ export type GetMemberNotificationResponses = {
 
 export type GetMemberNotificationResponse =
   GetMemberNotificationResponses[keyof GetMemberNotificationResponses];
+
+export type MarkMemberNotificationUnreadData = {
+  body?: never;
+  path: {
+    notificationId: string;
+  };
+  query?: never;
+  url: "/api/member/notifications/{notificationId}/read";
+};
+
+export type MarkMemberNotificationUnreadErrors = {
+  /**
+   * Default Response
+   */
+  400: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    issues?: Array<{
+      /**
+       * Where in the request, such as `body.topics[1].name`
+       */
+      path: string;
+      message: string;
+    }>;
+  };
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  404: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type MarkMemberNotificationUnreadError =
+  MarkMemberNotificationUnreadErrors[keyof MarkMemberNotificationUnreadErrors];
+
+export type MarkMemberNotificationUnreadResponses = {
+  /**
+   * Default Response
+   */
+  204: unknown;
+};
 
 export type MarkMemberNotificationReadData = {
   body?: never;
@@ -25230,6 +25363,97 @@ export type ReorderActivitiesResponses = {
 
 export type ReorderActivitiesResponse =
   ReorderActivitiesResponses[keyof ReorderActivitiesResponses];
+
+export type MoveActivityData = {
+  body: {
+    targetModuleId: string;
+    position: number;
+  };
+  path: {
+    courseId: string;
+    moduleId: string;
+    activityId: string;
+  };
+  query?: never;
+  url: "/api/courses/{courseId}/modules/{moduleId}/activities/{activityId}/move";
+};
+
+export type MoveActivityErrors = {
+  /**
+   * Default Response
+   */
+  400: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    issues?: Array<{
+      /**
+       * Where in the request, such as `body.topics[1].name`
+       */
+      path: string;
+      message: string;
+    }>;
+  };
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  404: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  409: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type MoveActivityError = MoveActivityErrors[keyof MoveActivityErrors];
+
+export type MoveActivityResponses = {
+  /**
+   * Default Response
+   */
+  200: Array<{
+    orgId: string;
+    id: string;
+    courseId: string;
+    title: string;
+    seq: number;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+};
+
+export type MoveActivityResponse = MoveActivityResponses[keyof MoveActivityResponses];
 
 export type CreateActivityData = {
   body: {

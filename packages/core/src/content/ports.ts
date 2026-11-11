@@ -191,6 +191,14 @@ export interface CourseManagementService {
     orderedIds: string[],
     actor: Actor,
   ): Promise<Module[]>;
+  moveActivity(
+    courseId: string,
+    moduleId: string,
+    activityId: string,
+    targetModuleId: string,
+    position: number,
+    actor: Actor,
+  ): Promise<Module[]>;
   /** @throws NotFoundError when the module — or, on update, the activity — does not exist. */
   saveActivity(
     courseId: string,
@@ -310,6 +318,14 @@ export interface ContentRepository {
     courseId: string,
     moduleId: string,
     orderedIds: string[],
+  ): Promise<Module[]>;
+  moveActivity(
+    orgId: string,
+    courseId: string,
+    moduleId: string,
+    activityId: string,
+    targetModuleId: string,
+    position: number,
   ): Promise<Module[]>;
   saveActivity(
     orgId: string,

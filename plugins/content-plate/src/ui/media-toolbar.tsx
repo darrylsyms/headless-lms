@@ -37,6 +37,7 @@ import {
   useOpenState,
 } from "./dropdown-menu";
 import { Toolbar, ToolbarButton, toolbarButtonVariants } from "./toolbar";
+import { MediaSourceButton } from "./media-source-button";
 
 export function MediaToolbar({ className, ...props }: ComponentProps<typeof Toolbar>) {
   const fixed = useFixedToolbar();
@@ -91,6 +92,7 @@ export function MediaToolbarButtons({ variant = "media" }: { variant?: MediaTool
 
   return (
     <>
+      {(element.type === KEYS.img || element.type === KEYS.video || element.type === KEYS.audio || element.type === KEYS.file) && <MediaSourceButton variant={variant} />}
       <MediaAlignButton variant={variant} {...mediaToolbarDropDownMenuProps} />
       <ToolbarButton
         onClick={() => showCaption(editor, element)}

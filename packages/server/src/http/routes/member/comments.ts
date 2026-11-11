@@ -9,7 +9,7 @@ import {
   CommentView,
   DiscussionActivityParam,
   EditComment,
-  PostComment,
+  PostActivityComment,
   Reactions,
   ReportComment,
   ResolveCommentFlags,
@@ -55,15 +55,20 @@ export async function memberCommentsRoutes(
       tags,
       summary: 'Post a comment or reply on an activity',
       description:
-        'For anyone who can open the course, while discussion is on for the activity (403 otherwise). Lands pending when the course requires review and you do not hold `courses:moderate` on it. Replies nest one level and need threading on.',
+        'For anyone who can open the course, while discussion is on for the activity (403 otherwise). Lands pending when the course requires review and you do not hold `courses:moderate` on it. Replies need threading on.',
       params: DiscussionActivityParam,
-      body: PostComment,
+      body: PostActivityComment,
       response: { 201: CommentView, ...refusals(403, 404) },
     },
     handler: async (req, reply) => {
       const actor = await resolveActor(container, req);
       const comment = await discussion.postComment(
-        { activityId: req.params.activityId, parentId: req.body.parentId, body: req.body.body },
+        {
+          activityId: req.params.activityId,
+          parentId: req.body.parentId,
+          body: req.body.body,
+          clientId: req.body.clientId,
+        },
         actor,
       );
       return reply.code(201).send(comment);

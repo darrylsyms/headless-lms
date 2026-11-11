@@ -61,6 +61,7 @@ function makeRepo(): ContentRepository {
     updateModule: vi.fn(),
     deleteModule: vi.fn(),
     reorderActivities: vi.fn(),
+    moveActivity: vi.fn(),
     saveActivity: vi.fn(),
     deleteActivity: vi.fn(),
     listDownloads: vi.fn(),
@@ -769,6 +770,20 @@ describe('activities', () => {
         orgId: 'org1',
         data: reordered[0],
       },
+    ]);
+  });
+
+  it('moves an activity without replacing it and emits the new order for both modules', async () => {
+    const repo = makeRepo();
+    const reordered = [makeModule({ id: 'm1' }), makeModule({ id: 'm2' })];
+    vi.mocked(repo.moveActivity).mockResolvedValue(reordered);
+    const { svc, appended } = build(repo);
+    expect(await svc.moveActivity('c1', 'm1', 'act1', 'm2', 1, ownerIn('org1'))).toBe(reordered);
+    expect(repo.moveActivity).toHaveBeenCalledWith('org1', 'c1', 'm1', 'act1', 'm2', 1);
+    expect(appended).toHaveLength(2);
+    expect(appended.map((event) => event.type)).toEqual([
+      'content.course.activities.reordered',
+      'content.course.activities.reordered',
     ]);
   });
 });
@@ -1750,6 +1765,7 @@ describe('permissions', () => {
       'updateModule',
       'deleteModule',
       'reorderActivities',
+      'moveActivity',
       'saveActivity',
       'deleteActivity',
       'listDownloads',

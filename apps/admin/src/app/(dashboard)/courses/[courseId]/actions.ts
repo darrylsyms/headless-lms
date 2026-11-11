@@ -79,6 +79,21 @@ export async function reorderActivitiesAction(
   return modules;
 }
 
+export async function moveActivityAction(
+  courseId: string,
+  moduleId: string,
+  activityId: string,
+  targetModuleId: string,
+  position: number,
+): Promise<Module[]> {
+  const modules = await Content.moveActivity(
+    { courseId, moduleId, activityId, targetModuleId, position },
+    await authHeaders(),
+  );
+  revalidateBuilder();
+  return modules;
+}
+
 export async function saveActivityAction(
   courseId: string,
   moduleId: string,

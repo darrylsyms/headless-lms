@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { genId } from '../shared/id.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../shared/errors.js';
 import type { Logger } from '../shared/ports.js';
@@ -329,7 +330,7 @@ export class DiscussionServiceImpl implements DiscussionService {
 
   private async postOnActivity(
     activityId: string,
-    { parentId, body }: PostCommentInput,
+    { parentId, body, clientId }: PostCommentInput,
     actor: Actor,
   ): Promise<CommentView> {
     const orgId = actor.orgId;
@@ -347,10 +348,6 @@ export class DiscussionServiceImpl implements DiscussionService {
       const parent = await this.repo.findComment(orgId, parentId);
       if (!parent || parent.activityId !== activityId) {
         throw new NotFoundError('Comment', parentId);
-      }
-
-      if (parent.parentId !== null) {
-        throw new ForbiddenError('A reply cannot have replies of its own');
       }
 
       if (parent.status !== 'published') {
@@ -379,6 +376,25 @@ export class DiscussionServiceImpl implements DiscussionService {
     };
     const mentioned = await this.courseOpeners(orgId, activity.courseId, mentionTokens(body));
     const saved = await this.uow.run(async (scope) => {
+      if (clientId) {
+        const request = await scope.discussion.claimCommentRequest(
+          orgId,
+          comment,
+          clientId,
+          createHash('sha256').update(body).digest('hex'),
+        );
+        if (!request.created) {
+          if (
+            request.activityId !== activityId ||
+            request.parentId !== parentId ||
+            request.bodyHash !== createHash('sha256').update(body).digest('hex')
+          )
+            {throw new ConflictError('This request ID was already used for another comment');}
+          const previous = await scope.discussion.findComment(orgId, request.commentId);
+          if (!previous) {throw new ConflictError('The original comment is unavailable');}
+          return previous;
+        }
+      }
       const row = await scope.discussion.insertComment(orgId, comment);
       await scope.mentions.sync(orgId, 'comment', row.id, mentioned, comment.createdAt);
       await scope.outbox.append([
@@ -489,6 +505,7 @@ export class DiscussionServiceImpl implements DiscussionService {
     itemId: string,
     reactionsOn: boolean,
     seesHeld: boolean,
+    nested = false,
   ): Promise<CommentView[]> {
     const readable = rows.filter((comment) => {
       if (comment.status === 'published' || comment.status === 'removed') {
@@ -505,9 +522,29 @@ export class DiscussionServiceImpl implements DiscussionService {
         comment.parentId === null && (comment.status !== 'removed' || heldOpen.has(comment.id)),
     );
     const rootIds = new Set(roots.map((root) => root.id));
-    const served = [...roots, ...replies.filter((reply) => rootIds.has(reply.parentId!))].sort(
-      (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+    const retained = new Set(
+      readable.filter((comment) => comment.status !== 'removed').map((comment) => comment.id),
     );
+    if (nested) {
+      const byId = new Map(readable.map((comment) => [comment.id, comment]));
+      for (const comment of readable) {
+        if (comment.status === 'removed') {continue;}
+        const seen = new Set<string>();
+        let ancestor = comment.parentId;
+        while (ancestor && !seen.has(ancestor)) {
+          seen.add(ancestor);
+          const parent = byId.get(ancestor);
+          if (!parent) {break;}
+          retained.add(parent.id);
+          ancestor = parent.parentId;
+        }
+      }
+    }
+    const served = (
+      nested
+        ? readable.filter((comment) => retained.has(comment.id))
+        : [...roots, ...replies.filter((reply) => rootIds.has(reply.parentId!))]
+    ).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
     const people = this.peopleIn(served);
     const [authors, permissions, reactions, mentioned] = await Promise.all([
       this.repo.authorsOf(orgId, people),
@@ -638,6 +675,7 @@ export class DiscussionServiceImpl implements DiscussionService {
         activity.courseId,
         config.reactions,
         actor.permissions.has('courses:moderate', activity.courseId),
+        true,
       ),
     };
   }

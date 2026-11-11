@@ -86,6 +86,9 @@ const container = {
         throw new NotFoundError('Notification', String(id));
       }
     }),
+    markUnread: record('markUnread', (id) => {
+      if (id !== 'ntf_1') {throw new NotFoundError('Notification', String(id));}
+    }),
     markAllRead: record('markAllRead', () => ({ marked: 3 })),
   },
 } as unknown as Container;
@@ -115,6 +118,17 @@ function last(method: string) {
 }
 
 describe('member notification routes', () => {
+  it('marks the acting member’s notification unread', async () => {
+    const res = await app.inject({ method: 'DELETE', url: '/api/member/notifications/ntf_1/read' });
+    expect(res.statusCode).toBe(204);
+    expect(last('markUnread')?.[0]).toBe('ntf_1');
+    const missing = await app.inject({
+      method: 'DELETE',
+      url: '/api/member/notifications/ntf_missing/read',
+    });
+    expect(missing.statusCode).toBe(404);
+  });
+
   it('lists with the filters read from the query string', async () => {
     const res = await app.inject({
       method: 'GET',

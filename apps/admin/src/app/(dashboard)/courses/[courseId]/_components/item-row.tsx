@@ -35,19 +35,23 @@ export function ItemRow({
   courseId,
   moduleId,
   canEdit,
+  reordering = false,
 }: {
   item: Activity;
   courseId: string;
   moduleId: string;
   canEdit: boolean;
+  reordering?: boolean;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: item.id,
-    disabled: !canEdit,
-  });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } =
+    useSortable({
+      id: item.id,
+      data: { kind: "activity", moduleId },
+      disabled: !canEdit || reordering,
+    });
 
   const settings = settingsOf(item);
   const published = activityPublished(settings);
@@ -80,10 +84,15 @@ export function ItemRow({
   return (
     <div
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
+      style={{
+        transform: isDragging ? undefined : CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.25 : undefined,
+      }}
       className={cn(
         "group flex items-center gap-3 rounded-md border border-transparent bg-surface px-2 py-2 transition-colors hover:border-line hover:bg-surface-2",
         isDragging && "relative z-10 border-line bg-surface-2 shadow-sm",
+        isOver && !isDragging && "border-brand bg-surface-2",
       )}
     >
       {canEdit ? (
@@ -102,12 +111,20 @@ export function ItemRow({
 
       <ActivityIcon />
 
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="truncate text-sm font-medium text-ink">{title}</span>
-        <div className="flex items-center gap-1.5 text-xs text-ink-4">
-          <span>{published ? "Published" : "Draft"}</span>
+      {canEdit ? (
+        <Link
+          href={`/courses/${courseId}/content/${item.id}`}
+          className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+        >
+          <span className="truncate text-sm font-medium text-ink">{title}</span>
+          <span className="text-xs text-ink-4">{published ? "Published" : "Draft"}</span>
+        </Link>
+      ) : (
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="truncate text-sm font-medium text-ink">{title}</span>
+          <span className="text-xs text-ink-4">{published ? "Published" : "Draft"}</span>
         </div>
-      </div>
+      )}
 
       {canEdit ? (
         <RowActions label="Item actions">

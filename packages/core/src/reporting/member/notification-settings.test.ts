@@ -68,7 +68,7 @@ function build(options: {
       findCommunity: async () => ({ settings: { digest: options.digest ?? null } }),
     } as unknown as ContentServicePort,
     progress: {} as never,
-    files: { signFile: async () => null },
+    files: { signFile: async () => null, readyFiles: async () => ({}) },
     fileUrls: createFileUrls('https://api.test', (key) => `https://cdn.test/${key}`),
     studentPortalUrl: 'https://app.test',
     access: {

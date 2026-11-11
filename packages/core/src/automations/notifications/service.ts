@@ -51,6 +51,12 @@ export class NotificationsServiceImpl implements NotificationsService {
     }
   }
 
+  async markUnread(notificationId: string, actor: MemberActor): Promise<void> {
+    if (!(await this.repo.markUnread(actor.orgId, actor.userId, notificationId))) {
+      throw new NotFoundError('Notification', notificationId);
+    }
+  }
+
   async markAllRead(filter: NotificationFilter, actor: MemberActor): Promise<{ marked: number }> {
     const marked = await this.repo.markAllRead(actor.orgId, actor.userId, filter, new Date());
     this.logger.debug('notifications marked read', {

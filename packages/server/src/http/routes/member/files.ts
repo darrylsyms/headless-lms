@@ -158,6 +158,26 @@ export async function memberFileRoutes(app: FastifyInstance, container: Containe
 
   r.route({
     method: 'GET',
+    url: '/api/member/activities/:activityId/assets/:assetId/download',
+    preHandler: app.requireOrgSession,
+    schema: {
+      operationId: 'downloadActivityFile',
+      tags,
+      summary: 'Download a file used in a lesson',
+      description:
+        'Checks lesson access and file attachment before issuing a short-lived download URL under the original filename.',
+      params: ActivityFileParams,
+      response: responses,
+    },
+    handler: async (req, reply) => {
+      const actor = await resolveActor(container, req);
+      const url = await member.activityFile(req.params.activityId, req.params.assetId, actor, true);
+      return redirect(reply, url);
+    },
+  });
+
+  r.route({
+    method: 'GET',
     url: '/api/member/downloads/:downloadId/assets/:assetId',
     preHandler: app.requireOrgSession,
     schema: {

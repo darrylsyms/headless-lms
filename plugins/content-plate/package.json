@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./media": "./src/media/index.tsx"
+    "./media": "./src/media/index.tsx",
+    "./markdown": "./src/markdown.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -30,6 +31,7 @@
     "@platejs/layout": "52.0.11",
     "@platejs/link": "52.0.11",
     "@platejs/list": "52.0.11",
+    "@platejs/markdown": "52.0.11",
     "@platejs/media": "52.0.11",
     "@platejs/resizable": "52.0.11",
     "@platejs/selection": "52.0.16",
@@ -53,6 +55,7 @@
     "react-lite-youtube-embed": "3.3.3",
     "react-player": "3.4.0",
     "react-tweet": "3.2.2",
+    "remark-gfm": "^4.0.1",
     "sonner": "^2.0.1",
     "tailwind-merge": "3.4.0",
     "use-file-picker": "2.1.4"

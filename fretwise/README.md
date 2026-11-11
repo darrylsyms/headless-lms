@@ -8,7 +8,7 @@ From the repository root, run `./fretwise/start-local.sh`. Open the admin at htt
 
 This initial machine setup uses Homebrew PostgreSQL on port 8005 and local, ignored credentials in `.env`. Its database files and captured test emails are in `tmp/`; they are not in Git. Keep them private. This setup is specific to this machine. For a fresh installation see the upstream README and self-hosting documentation. Do not use real customer information here.
 
-Object storage and outgoing email are not configured. Test emails are written to `tmp/emails`; upload and file-related features require a storage service. Docker is not installed on this machine.
+The local test uses MinIO for object storage; `start-local.sh` starts it on loopback when storage credentials are configured in `.env`. Install the Homebrew `minio` formula if the binary is unavailable. Data, configuration and logs live under `tmp/` and are ignored by Git; `./fretwise/stop-storage.sh` stops this instance. These local files and credentials need a backup before deleting the checkout or changing machines. Outgoing email is not configured; test emails are written to `tmp/emails`. Docker is not installed on this machine.
 
 ## Fretwise evaluation
 
@@ -27,3 +27,13 @@ The checkout keeps `upstream` pointing to Headless LMS. The first commit in this
 Fretwise-specific navigation lives in `apps/student/src/components/fretwise/portal-shell.tsx`; it is attached by a small change to the upstream root layout. The Insider and community pages are additions under `apps/student/src/app`. The community preview uses the current LMS API and is read-only. It needs `FRETWISE_COMMUNITY_ID` in `apps/student/.env.local`, set to the community ID for this local installation. It does not enumerate multiple communities. Do not commit local IDs or secrets. Course type links use the category field of the signed-in student’s accessible courses. The Insider Feed itself is not implemented yet.
 
 The course library combines a learner’s granted courses with published courses that their account has permission to read. This lets an owner or permitted instructor preview courses without a separate grant. Regular students still need a grant; a separate test student is useful to check their exact access experience. Admin and student apps share a localhost session cookie, so use a separate browser profile for simultaneous testing. Community access is also controlled by a grant, although staff with community-read permission can preview it.
+
+## Lesson discussion extension
+
+The local Fretwise checkout extends lesson discussions to retain the exact parent when replying to a reply. The LMS writes the comment and notification event together, and its notification processor applies access and channel preferences. The optional activity-comment `clientId` makes retries idempotent; reusing it with a different payload is rejected. Migration `0020_secret_bullseye` adds request records, and the OpenAPI contract and SDK reflect the new field. The change applies to lesson comments; community post threading retains the upstream behaviour. Older preview replies may still use the frontend's legacy SQLite reply-target mapping. Outbound email is not configured in this local environment.
+
+The local LMS also exposes `DELETE /api/member/notifications/:notificationId/read` to mark the signed-in member's in-app notification unread. The companion Practice Lab uses this together with the LMS mark-read endpoint so LMS-backed notifications share read state across both interfaces.
+
+The local file test uses a private bucket and five-minute signed download URLs. Lesson access is checked before a link is issued; a previously issued link can still be used until it expires. This local storage is for fictional test content, not a production service. Vimeo remains the intended video host; its domain privacy settings were not changed.
+
+The local LMS exposes an activity-file download route for lesson resources. It checks the same course and attachment access as the inline file route, then signs an attachment response using the stored filename. Inline media continues to use the existing file route.

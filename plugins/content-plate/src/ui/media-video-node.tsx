@@ -3,7 +3,7 @@
 import { useDraggable } from "@platejs/dnd";
 import { parseTwitterUrl, parseVideoUrl } from "@platejs/media";
 import { useMediaState } from "@platejs/media/react";
-import { ResizableProvider, useResizableValue } from "@platejs/resizable";
+import { ResizableProvider } from "@platejs/resizable";
 import { PlateElement, type PlateElementProps, useEditorMounted, withHOC } from "platejs/react";
 import LiteYouTubeEmbed from "react-lite-youtube-embed";
 import ReactPlayer from "react-player";
@@ -12,7 +12,8 @@ import { cn } from "../lib/utils";
 
 import { Caption, CaptionTextarea } from "./caption";
 import { MediaToolbar } from "./media-toolbar";
-import { mediaResizeHandleVariants, Resizable, ResizeHandle } from "./resize-handle";
+import { vimeoEmbed } from "./vimeo-embed";
+import { Resizable } from "./resize-handle";
 
 export const MediaVideoElement = withHOC(
   ResizableProvider,
@@ -27,11 +28,9 @@ export const MediaVideoElement = withHOC(
     } = useMediaState({
       urlParsers: [parseTwitterUrl, parseVideoUrl],
     });
-    const width = useResizableValue("width");
+    const vimeo = vimeoEmbed((props.element as { url?: unknown }).url);
 
     const isEditorMounted = useEditorMounted();
-
-    const isTweet = true;
 
     const { isDragging, handleRef } = useDraggable({
       element: props.element,
@@ -43,24 +42,15 @@ export const MediaVideoElement = withHOC(
           <Resizable
             align={align}
             className={cn(isDragging && "opacity-50")}
+            style={{ width: "100%", maxWidth: "100%", position: "relative" }}
             options={{
               align,
-              maxWidth: isTweet ? 550 : "100%",
-              minWidth: isTweet ? 300 : 100,
+              maxWidth: "100%",
+              minWidth: 100,
               readOnly,
             }}
           >
             <div className="group/media">
-              <ResizeHandle
-                className={mediaResizeHandleVariants({ direction: "left" })}
-                options={{ direction: "left" }}
-              />
-
-              <ResizeHandle
-                className={mediaResizeHandleVariants({ direction: "right" })}
-                options={{ direction: "right" }}
-              />
-
               {!isUpload && isYoutube && (
                 <div ref={handleRef}>
                   <LiteYouTubeEmbed
@@ -87,6 +77,12 @@ export const MediaVideoElement = withHOC(
                 </div>
               )}
 
+              {!isUpload && vimeo && (
+                <div ref={handleRef} className="aspect-video w-full overflow-hidden rounded-sm bg-black">
+                  <iframe title="Vimeo video" src={vimeo} className="size-full" allow="autoplay; fullscreen; picture-in-picture" allowFullScreen />
+                </div>
+              )}
+
               {/* TODO: Lazy load */}
               {isUpload && isEditorMounted && (
                 <div ref={handleRef}>
@@ -98,7 +94,7 @@ export const MediaVideoElement = withHOC(
             </div>
           </Resizable>
 
-          <Caption align={align} style={{ width }}>
+          <Caption align={align} style={{ width: "100%" }}>
             <CaptionTextarea placeholder="Write a caption..." readOnly={readOnly} />
           </Caption>
         </figure>

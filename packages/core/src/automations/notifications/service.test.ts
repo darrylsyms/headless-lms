@@ -18,6 +18,7 @@ function fakeRepo(over: Partial<NotificationsRepository> = {}): NotificationsRep
     find: vi.fn(async () => null),
     unreadCounts: vi.fn(async () => ({ org: 0, communities: [] })),
     markRead: vi.fn(async () => true),
+    markUnread: vi.fn(async () => true),
     markAllRead: vi.fn(async () => 0),
     ...over,
   };
@@ -96,5 +97,14 @@ describe('NotificationsService', () => {
       { reason: ['comment_author', 'thread_participant'] },
       expect.any(Date),
     );
+  });
+  it('marks only the acting member’s notification unread', async () => {
+    const repo = fakeRepo({
+      markUnread: vi.fn(async (_o, user, id) => user === 'usr_1' && id === 'ntf_1'),
+    });
+    const service = new NotificationsServiceImpl({ repo });
+    await expect(service.markUnread('ntf_1', ACTOR)).resolves.toBeUndefined();
+    expect(repo.markUnread).toHaveBeenCalledWith('org_1', 'usr_1', 'ntf_1');
+    await expect(service.markUnread('ntf_other', ACTOR)).rejects.toBeInstanceOf(NotFoundError);
   });
 });

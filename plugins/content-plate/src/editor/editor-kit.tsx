@@ -4,6 +4,8 @@
 // EditorKit minus the app-bound features (AI/copilot, comments/suggestions/
 // discussions, mentions, TOC, math, docx/markdown import, collaboration).
 import { TrailingBlockPlugin } from "platejs";
+import { MarkdownPlugin, remarkMdx } from "@platejs/markdown";
+import remarkGfm from "remark-gfm";
 
 import { AutoformatKit } from "./plugins/autoformat-kit";
 import { BasicBlocksKit } from "./plugins/basic-blocks-kit";
@@ -29,6 +31,7 @@ import { TableKit } from "./plugins/table-kit";
 import { ToggleKit } from "./plugins/toggle-kit";
 
 export const EditorKit = [
+  MarkdownPlugin.configure({ options: { remarkPlugins: [remarkGfm, remarkMdx] } }),
   ...BlockMenuKit,
 
   // Elements

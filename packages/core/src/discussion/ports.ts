@@ -64,6 +64,7 @@ export type { Actor } from '../shared/actor.js';
 export type PostCommentInput = {
   parentId: string | null;
   body: string;
+  clientId?: string;
 } & ({ activityId: string; postId?: undefined } | { postId: string; activityId?: undefined });
 
 /** A profile row as the repository loads it, keyed by `org_users.id`. `email`
@@ -180,6 +181,18 @@ export interface CommunityAccess {
 
 export interface DiscussionRepository extends PostCommentReader, AuthorProfileReader {
   insertComment(orgId: string, comment: Comment): Promise<Comment>;
+  claimCommentRequest(
+    orgId: string,
+    comment: Comment,
+    clientId: string,
+    bodyHash: string,
+  ): Promise<{
+    created: boolean;
+    commentId: string;
+    activityId: string;
+    parentId: string | null;
+    bodyHash: string;
+  }>;
   findComment(orgId: string, id: string): Promise<Comment | null>;
   commenterIds(
     orgId: string,

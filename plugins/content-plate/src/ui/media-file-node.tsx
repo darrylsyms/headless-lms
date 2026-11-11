@@ -12,15 +12,18 @@ import {
   withHOC,
 } from "platejs/react";
 import type { MouseEvent } from "react";
+import { useFixedToolbar } from "../hooks/use-host-slots";
 
 import { BlockActionButton } from "./block-context-menu";
 import { Caption, CaptionTextarea } from "./caption";
+import { MediaToolbar } from "./media-toolbar";
 
 export const MediaFileElement = withHOC(
   ResizableProvider,
   function MediaFileElement(props: PlateElementProps) {
     const readOnly = useReadOnly();
     const editor = useEditorRef();
+    const fixedToolbar = useFixedToolbar();
     const { name } = useMediaState();
 
     const onOpenMenu = (e: MouseEvent) => {
@@ -33,7 +36,7 @@ export const MediaFileElement = withHOC(
     return (
       <PlateElement className="my-px rounded-sm" {...props}>
         <div
-          className="group relative m-0 flex cursor-pointer items-center rounded px-0.5 py-[3px] transition-bg-ease hover:bg-muted"
+          className="group group/media relative m-0 flex cursor-pointer items-center rounded px-0.5 py-[3px] transition-bg-ease hover:bg-muted"
           contentEditable={false}
           onClick={onOpenMenu}
           role="button"
@@ -51,7 +54,8 @@ export const MediaFileElement = withHOC(
             />
           </Caption>
 
-          <BlockActionButton className="-translate-y-1/2 top-1/2" />
+          {fixedToolbar && <BlockActionButton className="-translate-y-1/2 top-1/2" />}
+          <div onClick={(event) => event.stopPropagation()}><MediaToolbar /></div>
         </div>
 
         {props.children}

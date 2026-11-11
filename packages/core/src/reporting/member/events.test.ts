@@ -134,7 +134,7 @@ function build(world: World = {}) {
     repo,
     content,
     progress: {} as never,
-    files: { signFile },
+    files: { signFile, readyFiles: async () => ({}) },
     fileUrls: createFileUrls('https://api.test', (key) => `https://cdn.test/${key}`),
     access: {
       hasAccess: async (_o: string, orgUserId: string) =>

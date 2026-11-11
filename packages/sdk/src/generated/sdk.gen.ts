@@ -155,6 +155,7 @@ import type {
   DisconnectIntegrationResponses,
   DismissCommentReportsErrors,
   DismissCommentReportsResponses,
+  DownloadActivityFileErrors,
   DownloadLibraryFileErrors,
   EditChatMessageErrors,
   EditChatMessageResponses,
@@ -409,8 +410,12 @@ import type {
   MarkChatReadResponses,
   MarkMemberNotificationReadErrors,
   MarkMemberNotificationReadResponses,
+  MarkMemberNotificationUnreadErrors,
+  MarkMemberNotificationUnreadResponses,
   ModerateRemoveCommentErrors,
   ModerateRemoveCommentResponses,
+  MoveActivityErrors,
+  MoveActivityResponses,
   OpenPostCommentsErrors,
   OpenPostCommentsResponses,
   PatchCommunitySettingsErrors,
@@ -1907,6 +1912,39 @@ export class Notifications {
     >({
       responseStyle: "data",
       url: "/api/member/notifications/{notificationId}",
+      ...options,
+      ...params,
+    });
+  }
+
+  /**
+   * Mark one of your notifications unread
+   *
+   * For any member of the organization. Returns 404 when the notification is not yours.
+   */
+  public static markMemberNotificationUnread<ThrowOnError extends boolean = false>(
+    parameters: {
+      notificationId: string;
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<
+    MarkMemberNotificationUnreadResponses,
+    MarkMemberNotificationUnreadErrors,
+    ThrowOnError,
+    "data"
+  > {
+    const params = buildClientParams(
+      [parameters],
+      [{ args: [{ in: "path", key: "notificationId" }] }],
+    );
+    return (options?.client ?? client).delete<
+      MarkMemberNotificationUnreadResponses,
+      MarkMemberNotificationUnreadErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/member/notifications/{notificationId}/read",
       ...options,
       ...params,
     });
@@ -3579,6 +3617,53 @@ export class Content {
     >({
       responseStyle: "data",
       url: "/api/courses/{courseId}/modules/{moduleId}/activities/reorder",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    });
+  }
+
+  /**
+   * Move an activity to another module
+   *
+   * Requires `courses:write`. Preserves the activity and inserts it at the requested position.
+   */
+  public static moveActivity<ThrowOnError extends boolean = false>(
+    parameters: {
+      courseId: string;
+      moduleId: string;
+      activityId: string;
+      targetModuleId: string;
+      position: number;
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<MoveActivityResponses, MoveActivityErrors, ThrowOnError, "data"> {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "courseId" },
+            { in: "path", key: "moduleId" },
+            { in: "path", key: "activityId" },
+            { in: "body", key: "targetModuleId" },
+            { in: "body", key: "position" },
+          ],
+        },
+      ],
+    );
+    return (options?.client ?? client).post<
+      MoveActivityResponses,
+      MoveActivityErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/courses/{courseId}/modules/{moduleId}/activities/{activityId}/move",
       ...options,
       ...params,
       headers: {
@@ -9315,13 +9400,14 @@ export class Discussion {
   /**
    * Post a comment or reply on an activity
    *
-   * For anyone who can open the course, while discussion is on for the activity (403 otherwise). Lands pending when the course requires review and you do not hold `courses:moderate` on it. Replies nest one level and need threading on.
+   * For anyone who can open the course, while discussion is on for the activity (403 otherwise). Lands pending when the course requires review and you do not hold `courses:moderate` on it. Replies need threading on.
    */
   public static postComment<ThrowOnError extends boolean = false>(
     parameters: {
       activityId: string;
       body: string;
       parentId?: string | null;
+      clientId?: string;
     },
     options?: Options<never, ThrowOnError>,
   ): RequestResult<PostCommentResponses, PostCommentErrors, ThrowOnError, "data"> {
@@ -9333,6 +9419,7 @@ export class Discussion {
             { in: "path", key: "activityId" },
             { in: "body", key: "body" },
             { in: "body", key: "parentId" },
+            { in: "body", key: "clientId" },
           ],
         },
       ],
@@ -10284,6 +10371,42 @@ export class Files {
     return (options?.client ?? client).get<unknown, GetActivityFileErrors, ThrowOnError, "data">({
       responseStyle: "data",
       url: "/api/member/activities/{activityId}/assets/{assetId}",
+      ...options,
+      ...params,
+    });
+  }
+
+  /**
+   * Download a file used in a lesson
+   *
+   * Checks lesson access and file attachment before issuing a short-lived download URL under the original filename.
+   */
+  public static downloadActivityFile<ThrowOnError extends boolean = false>(
+    parameters: {
+      activityId: string;
+      assetId: string;
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<unknown, DownloadActivityFileErrors, ThrowOnError, "data"> {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "activityId" },
+            { in: "path", key: "assetId" },
+          ],
+        },
+      ],
+    );
+    return (options?.client ?? client).get<
+      unknown,
+      DownloadActivityFileErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/member/activities/{activityId}/assets/{assetId}/download",
       ...options,
       ...params,
     });

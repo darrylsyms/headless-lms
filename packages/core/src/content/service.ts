@@ -602,6 +602,34 @@ export class ContentService
     return modules;
   }
 
+  async moveActivity(
+    courseId: string,
+    moduleId: string,
+    activityId: string,
+    targetModuleId: string,
+    position: number,
+    actor: Actor,
+  ): Promise<Module[]> {
+    this.require(actor, 'courses:write', courseId);
+    const orgId = actor.orgId;
+    return this.uow.run(async ({ content, outbox }) => {
+      const reordered = await content.moveActivity(
+        orgId,
+        courseId,
+        moduleId,
+        activityId,
+        targetModuleId,
+        position,
+      );
+      await outbox.append(
+        reordered
+          .filter((module) => module.id === moduleId || module.id === targetModuleId)
+          .map((module) => contentEvents.activitiesReordered.make({ orgId, data: module })),
+      );
+      return reordered;
+    });
+  }
+
   async saveActivity(
     courseId: string,
     moduleId: string,

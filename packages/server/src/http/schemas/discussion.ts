@@ -90,13 +90,12 @@ export type ActivityComments = z.infer<typeof ActivityComments>;
 export const PostComment = z
   .object({
     body: z.string().min(1).max(10_000),
-    parentId: idSchema
-      .nullable()
-      .default(null)
-      .describe('The comment this replies to. Replies nest one level, under a root comment'),
+    parentId: idSchema.nullable().default(null).describe('The comment this replies to'),
   })
   .strict();
 export type PostComment = z.infer<typeof PostComment>;
+
+export const PostActivityComment = PostComment.extend({ clientId: z.uuid().optional() });
 
 export const EditComment = z.object({ body: z.string().min(1).max(10_000) }).strict();
 export type EditComment = z.infer<typeof EditComment>;

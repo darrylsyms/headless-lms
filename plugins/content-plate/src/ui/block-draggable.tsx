@@ -13,9 +13,10 @@ import {
   useEditorRef,
   useElement,
   usePluginOption,
-  useSelected,
 } from "platejs/react";
 import { memo, useEffect, useMemo, useState, type ComponentProps, type RefObject } from "react";
+import { createPortal } from "react-dom";
+import { useDragLayer } from "react-dnd";
 
 import { cn } from "../lib/utils";
 
@@ -69,8 +70,9 @@ function Draggable(props: PlateElementProps) {
   const { children, editor, element, path } = props;
   const blockSelectionApi = editor.getApi(BlockSelectionPlugin).blockSelection;
 
-  const { isAboutToDrag, isDragging, nodeRef, previewRef, handleRef } = useDraggable({
+  const { isDragging, nodeRef, previewRef, handleRef } = useDraggable({
     element,
+    preview: { disable: true },
     onDropHandler: (_, { dragItem }) => {
       const id = (dragItem as { id: string[] | string }).id;
 
@@ -86,6 +88,11 @@ function Draggable(props: PlateElementProps) {
   const isInTable = path.length === 4;
 
   const [previewTop, setPreviewTop] = useState(0);
+  const [previewWidth, setPreviewWidth] = useState(0);
+  const [cursorOffset, setCursorOffset] = useState({ x: 0, y: 0 });
+  const cursor = useDragLayer((monitor) =>
+    monitor.getItem()?.element?.id === element.id ? monitor.getClientOffset() : null,
+  );
 
   const resetPreview = () => {
     if (previewRef.current) {
@@ -101,13 +108,6 @@ function Draggable(props: PlateElementProps) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDragging]);
-
-  useEffect(() => {
-    if (isAboutToDrag) {
-      previewRef.current?.classList.remove("opacity-0");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAboutToDrag]);
 
   const [dragButtonTop, setDragButtonTop] = useState(0);
 
@@ -142,7 +142,8 @@ function Draggable(props: PlateElementProps) {
               )}
             >
               <Button
-                className="absolute right-0 h-6 w-6 p-0"
+                className={cn("absolute right-0 h-6 w-6 cursor-grab p-0", isDragging && "cursor-grabbing")}
+                aria-label="Drag block or open block menu"
                 data-plate-prevent-deselect
                 ref={handleRef}
                 style={{ top: `${dragButtonTop + 3}px` }}
@@ -163,6 +164,8 @@ function Draggable(props: PlateElementProps) {
                   previewRef={previewRef}
                   resetPreview={resetPreview}
                   setPreviewTop={setPreviewTop}
+                  setPreviewWidth={setPreviewWidth}
+                  setCursorOffset={setCursorOffset}
                 />
               </Button>
 
@@ -176,12 +179,19 @@ function Draggable(props: PlateElementProps) {
         </Gutter>
       )}
 
-      <div
-        className={cn("-left-0 absolute hidden w-full")}
-        contentEditable={false}
-        ref={previewRef}
-        style={{ top: `${-previewTop}px` }}
-      />
+      {typeof document !== "undefined" && createPortal(
+        <div
+          className="pointer-events-none fixed left-0 top-0 z-[9999] hidden"
+          contentEditable={false}
+          ref={previewRef}
+          style={{
+            visibility: isDragging && cursor ? "visible" : "hidden",
+            width: previewWidth,
+            transform: `translate(${(cursor?.x ?? 0) - cursorOffset.x}px, ${(cursor?.y ?? 0) - cursorOffset.y - previewTop}px)`,
+          }}
+        />,
+        document.body,
+      )}
 
       <div
         className="slate-blockWrapper my-px flow-root"
@@ -201,19 +211,17 @@ function Gutter({ children, className, ...props }: ComponentProps<"div">) {
   const editor = useEditorRef();
   const element = useElement();
   const isSelectionAreaVisible = usePluginOption(BlockSelectionPlugin, "isSelectionAreaVisible");
-  const selected = useSelected();
 
   return (
     <div
       {...props}
       className={cn(
         "slate-gutterLeft",
-        "-translate-x-full absolute top-0 z-50 flex h-full cursor-text hover:opacity-100 sm:opacity-0",
+        "-translate-x-full absolute top-0 z-50 flex h-full cursor-text hover:opacity-100 focus-within:opacity-100 sm:opacity-0",
         getPluginByType(editor, element.type)?.node.isContainer
           ? "group-hover/container:opacity-100"
           : "group-hover:opacity-100",
         isSelectionAreaVisible && "hidden",
-        !selected && "opacity-0",
         className,
       )}
       contentEditable={false}
@@ -228,11 +236,15 @@ const DragHandle = memo(function DragHandle({
   previewRef,
   resetPreview,
   setPreviewTop,
+  setPreviewWidth,
+  setCursorOffset,
 }: {
   isDragging: boolean;
   previewRef: RefObject<HTMLDivElement | null>;
   resetPreview: () => void;
   setPreviewTop: (top: number) => void;
+  setPreviewWidth: (width: number) => void;
+  setCursorOffset: (offset: { x: number; y: number }) => void;
 }) {
   const editor = useEditorRef();
   const element = useElement();
@@ -246,6 +258,10 @@ const DragHandle = memo(function DragHandle({
           resetPreview();
 
           if (e.button !== 0 || e.shiftKey) return; // Only left mouse button
+
+          const rect = editor.api.toDOMNode(element)!.getBoundingClientRect();
+          setPreviewWidth(rect.width);
+          setCursorOffset({ x: e.clientX - rect.left, y: e.clientY - rect.top });
 
           const blockSelection = editor
             .getApi(BlockSelectionPlugin)
@@ -270,7 +286,6 @@ const DragHandle = memo(function DragHandle({
           const elements = createDragPreviewElements(editor, blocks);
           previewRef.current?.append(...elements);
           previewRef.current?.classList.remove("hidden");
-          previewRef.current?.classList.add("opacity-0");
           editor.setOption(DndPlugin, "multiplePreviewRef", previewRef);
 
           editor
@@ -418,6 +433,22 @@ const createDragPreviewElements = (editor: PlateEditor, blocks: TElement[]): HTM
     const domNode = editor.api.toDOMNode(node)!;
     const newDomNode = domNode.cloneNode(true) as HTMLElement;
 
+    const typography = ["font-family", "font-size", "font-weight", "font-style", "font-stretch", "font-variant", "font-feature-settings", "font-kerning", "line-height", "letter-spacing", "word-spacing", "text-align", "text-transform", "text-decoration", "color", "white-space", "word-break", "overflow-wrap", "direction"];
+    const originals = [domNode, ...domNode.querySelectorAll("*")];
+    const copies = [newDomNode, ...newDomNode.querySelectorAll("*")];
+    originals.forEach((original, index) => {
+      const copy = copies[index];
+      if (!(copy instanceof HTMLElement)) return;
+      const computed = window.getComputedStyle(original);
+      typography.forEach((property) => copy.style.setProperty(property, computed.getPropertyValue(property)));
+    });
+
+    newDomNode.querySelectorAll('[data-slot="block-selection"]').forEach((overlay) => overlay.remove());
+    [newDomNode, ...newDomNode.querySelectorAll<HTMLElement>("*")].forEach((element) => {
+      element.style.setProperty("background-color", "transparent", "important");
+      element.style.setProperty("box-shadow", "none", "important");
+    });
+
     // Apply visual compensation for horizontal scroll
     const applyScrollCompensation = (original: Element, cloned: HTMLElement) => {
       const scrollLeft = original.scrollLeft;
@@ -454,6 +485,7 @@ const createDragPreviewElements = (editor: PlateEditor, blocks: TElement[]): HTM
     const wrapper = document.createElement("div");
     wrapper.append(newDomNode);
     wrapper.style.display = "flow-root";
+    wrapper.style.opacity = "0.6";
 
     const lastDomNode = blocks[index - 1];
 

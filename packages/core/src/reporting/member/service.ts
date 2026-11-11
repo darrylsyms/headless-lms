@@ -144,7 +144,7 @@ export type MemberReportServiceParams = {
   repo: MemberReportRepository;
   content: MemberContent;
   progress: Pick<ProgressService, 'get' | 'listByTargets'>;
-  files: Pick<AssetFiles, 'signFile'>;
+  files: Pick<AssetFiles, 'signFile' | 'readyFiles'>;
   fileUrls: FileUrls;
   access: MemberAccess;
   people: MemberPeople;
@@ -165,7 +165,7 @@ export class MemberReportServiceImpl implements MemberReportService {
   private readonly repo: MemberReportRepository;
   private readonly content: MemberContent;
   private readonly progress: Pick<ProgressService, 'get' | 'listByTargets'>;
-  private readonly files: Pick<AssetFiles, 'signFile'>;
+  private readonly files: Pick<AssetFiles, 'signFile' | 'readyFiles'>;
   private readonly fileUrls: FileUrls;
   private readonly access: MemberAccess;
   private readonly people: MemberPeople;
@@ -503,7 +503,12 @@ export class MemberReportServiceImpl implements MemberReportService {
     );
   }
 
-  async activityFile(activityId: string, assetId: string, actor: Actor): Promise<string> {
+  async activityFile(
+    activityId: string,
+    assetId: string,
+    actor: Actor,
+    download = false,
+  ): Promise<string> {
     const system = this.system(actor);
     const activity = await this.content.getActivity(activityId, system);
     if (!activity) {
@@ -520,6 +525,16 @@ export class MemberReportServiceImpl implements MemberReportService {
     const links = await this.content.listCourseActivityAssets(activity.courseId, system);
     if (!links.some((link) => link.activityId === activityId && link.assetId === assetId)) {
       throw new NotFoundError('Lesson file', assetId);
+    }
+    if (download) {
+      const files = await this.files.readyFiles(actor.orgId, [assetId]);
+      const file = files[assetId];
+      if (!file) {throw new NotFoundError('Lesson file', assetId);}
+      return signed(
+        await this.files.signFile(actor.orgId, assetId, { saveAs: file.filename }),
+        'Lesson file',
+        assetId,
+      );
     }
     return signed(await this.files.signFile(actor.orgId, assetId), 'Lesson file', assetId);
   }

@@ -20,6 +20,7 @@ import {
   Blocks,
   ChevronLeft,
   ChevronRight,
+  Download,
   Eye,
   ListTree,
   PanelLeftClose,
@@ -28,16 +29,19 @@ import {
 } from "lucide-react";
 
 import editorModule from "@/editor.config";
+import { activityToMarkdown } from "@headless-lms/content-plate/markdown";
 import {
   deleteActivityAction,
   updateActivitySettingsAction,
 } from "@/app/(dashboard)/courses/[courseId]/actions";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { activityPublished } from "@/lib/api/compose";
 import type { ActivityNode, ActivitySettings, ModuleTree } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
+import { calculateLessonDuration, firstContentIndex } from "@/lib/lesson-duration";
 
 import type { BuilderPanel } from "../load-activity";
 import { ActivitySettingsPanel } from "./activity-settings-panel";
@@ -219,6 +223,13 @@ export function ActivityBuilder({
 
     setSaving(true);
     try {
+      if (!foreignFormat && meta.type === "plate") {
+        patch.lessonDuration = await calculateLessonDuration(latestConfig.current, activity.assetUrls ?? {});
+        const previous = (activity.settings as ActivitySettings | null)?.lessonDuration;
+        if (!contentDirty && patch.lessonDuration.kind === "video" && patch.lessonDuration.minutes === null && previous?.kind === "video" && previous.basis === "video" && previous.minutes != null) {
+          patch.lessonDuration = previous;
+        }
+      }
       const refusal = await updateActivitySettingsAction(course.id, moduleId, activity.id, patch);
       if (refusal) {
         toast.error("Couldn't save activity", { description: refusal.refused });
@@ -227,6 +238,9 @@ export function ActivityBuilder({
       reset(values);
       setContentDirty(false);
       toast.success("Saved");
+      if (Array.isArray(latestConfig.current) && latestConfig.current[firstContentIndex(latestConfig.current)]?.type === "video" && patch.lessonDuration?.kind === "video" && patch.lessonDuration.minutes === null) {
+        toast.warning("Video duration could not be read", { description: "Check that the video allows embedding on this domain, then save the lesson again." });
+      }
       router.refresh();
       return true;
     } catch (err) {
@@ -235,7 +249,7 @@ export function ActivityBuilder({
     } finally {
       setSaving(false);
     }
-  }, [handleSubmit, isDirty, contentDirty, reset, course.id, moduleId, activity.id, router]);
+  }, [handleSubmit, isDirty, contentDirty, reset, course.id, moduleId, activity.id, activity.assetUrls, activity.settings, foreignFormat, router]);
 
   const leave = useCallback(
     async (href: string) => {
@@ -268,6 +282,39 @@ export function ActivityBuilder({
   );
 
   const slots = useMemo(() => ({ toolbar: toolbarEl, blocks: blocksEl }), [toolbarEl, blocksEl]);
+
+  function exportMarkdown() {
+    try {
+      const title = form.getValues("title").trim() || "Untitled activity";
+      const markdown = activityToMarkdown(latestConfig.current, activity.assetUrls ?? {});
+      const blob = new Blob([`# ${title.replace(/\n/g, " ")}\n\n${markdown}`], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${title.replace(/[\\/:*?"<>|]/g, "-")}.md`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      toast.error("Couldn't export Markdown");
+    }
+  }
+
+  async function exportPdf() {
+    try {
+      const title = form.getValues("title").trim() || "Untitled activity";
+      const { createActivityPdf } = await import("@/lib/activity-pdf");
+      const { blob, missingImages } = await createActivityPdf(title, latestConfig.current, activity.assetUrls ?? {}, activity.id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${title.replace(/[\\/:*?"<>|]/g, "-")}.pdf`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      if (missingImages) toast.warning("PDF downloaded with unavailable images", { description: `${missingImages} image(s) could not be included.` });
+    } catch (err) {
+      toast.error("Couldn't export PDF", { description: (err as Error).message });
+    }
+  }
 
   async function deleteActivity() {
     setDeleting(true);
@@ -332,6 +379,13 @@ export function ActivityBuilder({
             <span className="max-sm:sr-only">Unsaved changes</span>
           </p>
         ) : null}
+        {!foreignFormat && meta.type === "plate" && <DropdownMenu>
+          <DropdownMenuTrigger asChild><Button variant="secondary" size="sm"><Download />Export</Button></DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={exportMarkdown}>Markdown (.md)</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void exportPdf()}>PDF (.pdf)</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>}
         <Button asChild variant="secondary" size="sm">
           <Link
             href={`${base}/${activity.id}/preview?panel=${panel ?? "none"}`}

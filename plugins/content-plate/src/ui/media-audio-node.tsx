@@ -5,6 +5,7 @@ import { ResizableProvider } from "@platejs/resizable";
 import { PlateElement, type PlateElementProps, withHOC } from "platejs/react";
 
 import { Caption, CaptionTextarea } from "./caption";
+import { MediaToolbar } from "./media-toolbar";
 
 export const MediaAudioElement = withHOC(
   ResizableProvider,
@@ -13,10 +14,11 @@ export const MediaAudioElement = withHOC(
 
     return (
       <PlateElement className="mb-1" {...props}>
-        <figure className="group relative" contentEditable={false}>
+        <figure className="group group/media relative" contentEditable={false}>
           <div className="h-16">
             <audio className="size-full" controls src={unsafeUrl} />
           </div>
+          <MediaToolbar />
 
           <Caption align={align} style={{ width: "100%" }}>
             <CaptionTextarea

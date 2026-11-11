@@ -59,7 +59,12 @@ export interface MemberReportService {
   ): Promise<Page<EventAttendee>>;
   eventFile(eventId: string, assetId: string, actor: Actor): Promise<string>;
   /** Signed URL of an asset the activity links, for a person who can open its course. */
-  activityFile(activityId: string, assetId: string, actor: Actor): Promise<string>;
+  activityFile(
+    activityId: string,
+    assetId: string,
+    actor: Actor,
+    download?: boolean,
+  ): Promise<string>;
   /** Signed download URL of a file in a download the person can open. */
   downloadFile(downloadId: string, assetId: string, actor: Actor): Promise<string>;
   directory(

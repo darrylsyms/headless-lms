@@ -625,6 +625,75 @@ export class DrizzleContentRepository implements ContentRepository {
     });
   }
 
+  moveActivity(
+    orgId: string,
+    courseId: string,
+    moduleId: string,
+    activityId: string,
+    targetModuleId: string,
+    position: number,
+  ): Promise<Module[]> {
+    return this.tx(async (tx) => {
+      const moduleIds = [moduleId, targetModuleId].sort();
+      const locked = await tx
+        .select({ id: modules.id })
+        .from(modules)
+        .where(
+          and(
+            eq(modules.orgId, orgId),
+            eq(modules.courseId, courseId),
+            inArray(modules.id, moduleIds),
+          ),
+        )
+        .orderBy(asc(modules.id))
+        .for("update");
+      if (!locked.some((module) => module.id === moduleId))
+        {throw new NotFoundError("Module", moduleId);}
+      if (!locked.some((module) => module.id === targetModuleId))
+        {throw new NotFoundError("Module", targetModuleId);}
+      if (moduleId === targetModuleId) {throw new ConflictError("Choose a different module");}
+      const rows = await tx
+        .select({ id: activities.id, moduleId: activities.moduleId })
+        .from(activities)
+        .where(
+          and(
+            eq(activities.orgId, orgId),
+            eq(activities.courseId, courseId),
+            inArray(activities.moduleId, moduleIds),
+          ),
+        )
+        .orderBy(asc(activities.seq))
+        .for("update");
+      const from = rows.filter((row) => row.moduleId === moduleId).map((row) => row.id);
+      const to = rows.filter((row) => row.moduleId === targetModuleId).map((row) => row.id);
+      const index = from.indexOf(activityId);
+      if (index < 0) {throw new NotFoundError("Activity", activityId);}
+      if (!Number.isInteger(position) || position < 0 || position > to.length)
+        {throw new ConflictError("The destination position is no longer valid");}
+      for (const ids of [from, to]) {
+        for (let i = 0; i < ids.length; i++)
+          {await tx
+            .update(activities)
+            .set({ seq: -(i + 1) })
+            .where(and(eq(activities.orgId, orgId), eq(activities.id, ids[i]!)));}
+      }
+      from.splice(index, 1);
+      await tx
+        .update(activities)
+        .set({ moduleId: targetModuleId, seq: -(to.length + 1) })
+        .where(and(eq(activities.orgId, orgId), eq(activities.id, activityId)));
+      to.splice(position, 0, activityId);
+      for (const ids of [from, to]) {
+        for (let i = 0; i < ids.length; i++)
+          {await tx
+            .update(activities)
+            .set({ seq: i })
+            .where(and(eq(activities.orgId, orgId), eq(activities.id, ids[i]!)));}
+      }
+      return this.listModules(tx, orgId, courseId);
+    });
+  }
+
   saveActivity(
     orgId: string,
     courseId: string,

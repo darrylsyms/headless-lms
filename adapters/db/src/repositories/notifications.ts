@@ -286,6 +286,17 @@ export class DrizzleNotificationsRepository implements NotificationsRepository {
     return rows.length > 0;
   }
 
+  async markUnread(orgId: string, userId: string, notificationId: string): Promise<boolean> {
+    const rows = await this.db
+      .update(n)
+      .set({ readAt: null })
+      .where(
+        and(eq(n.orgId, orgId), eq(n.userId, userId), eq(n.id, notificationId), eq(n.inApp, true)),
+      )
+      .returning({ id: n.id });
+    return rows.length > 0;
+  }
+
   async markAllRead(
     orgId: string,
     userId: string,

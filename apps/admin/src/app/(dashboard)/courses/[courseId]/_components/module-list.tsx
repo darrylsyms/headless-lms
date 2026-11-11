@@ -1,15 +1,21 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
+  DragOverlay,
   KeyboardSensor,
   PointerSensor,
   closestCenter,
+  pointerWithin,
+  type CollisionDetection,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragOverEvent,
+  type DragMoveEvent,
+  type DragStartEvent,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -18,9 +24,9 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { restrictToParentElement, restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { CSS } from "@dnd-kit/utilities";
-import { Check, GripVertical, Plus, X } from "lucide-react";
+import { Check, FileText, GripVertical, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -28,15 +34,18 @@ import { Input } from "@/components/ui/input";
 import { RowActions } from "@/components/data-table/row-actions";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import type { ActivityNode, ModuleTree } from "@/lib/api/types";
+import type { ActivityNode, ActivitySettings, ModuleTree } from "@/lib/api/types";
+import { activityPublished } from "@/lib/api/compose";
 import { cn } from "@/lib/utils";
 
 import { ItemRow } from "./item-row";
+import { activityModule, placeActivity, targetModule } from "./curriculum-drag";
 import { NewActivityDialog } from "./new-activity-dialog";
 import {
   createModuleAction,
   deleteModuleAction,
   reorderActivitiesAction,
+  moveActivityAction,
   reorderModulesAction,
   updateModuleAction,
 } from "../actions";
@@ -48,10 +57,52 @@ function useDndSensors() {
   );
 }
 
-const DND_MODIFIERS = [restrictToVerticalAxis, restrictToParentElement];
+const DND_MODIFIERS = [restrictToVerticalAxis];
+
+const curriculumCollisions: CollisionDetection = (args) => {
+  const kind = args.active.data.current?.kind;
+  const containers = args.droppableContainers.filter((item) =>
+    kind === "module"
+      ? item.data.current?.kind === "module"
+      : item.data.current?.kind === "module" || item.data.current?.kind === "activity",
+  );
+  const pointer = pointerWithin({ ...args, droppableContainers: containers });
+  if (kind === "activity") {
+    const isRow = (id: string | number) =>
+      containers.find((container) => container.id === id)?.data.current?.kind === "activity";
+    const row =
+      pointer.find((item) => item.id !== args.active.id && isRow(item.id)) ??
+      pointer.find((item) => isRow(item.id));
+    if (row) return [row];
+  }
+  return pointer.length ? pointer : closestCenter({ ...args, droppableContainers: containers });
+};
+
+function ActivityDragPreview({ item }: { item: ActivityNode }) {
+  const settings = (item.settings ?? {}) as ActivitySettings;
+  return (
+    <div className="flex items-center gap-3 rounded-md border border-line bg-surface px-2 py-2 shadow-lg">
+      <span className="grid size-7 shrink-0 place-items-center text-ink-4">
+        <GripVertical className="size-4" />
+      </span>
+      <span className="grid size-7 shrink-0 place-items-center rounded-md bg-surface-2 text-ink-3">
+        <FileText className="size-4" />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="truncate text-sm font-medium text-ink">
+          {settings.title?.trim() || "Untitled activity"}
+        </span>
+        <span className="text-xs text-ink-4">
+          {activityPublished(settings) ? "Published" : "Draft"}
+        </span>
+      </span>
+      <span aria-hidden="true" className="w-7 shrink-0" />
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
-// One module: sortable card + its own item DnD context.
+// One module and its sortable activities.
 // ---------------------------------------------------------------------------
 
 function SortableModule({
@@ -59,54 +110,30 @@ function SortableModule({
   courseId,
   index,
   canEdit,
+  reordering,
 }: {
   module: ModuleTree;
   courseId: string;
   index: number;
   canEdit: boolean;
+  reordering: boolean;
 }) {
   const router = useRouter();
-  const sensors = useDndSensors();
   const [isPending, startTransition] = useTransition();
 
-  const [items, setItems] = useState<ActivityNode[]>(module.activities);
-  const [serverItems, setServerItems] = useState<ActivityNode[]>(module.activities);
+  const items = module.activities;
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(module.title);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const [newItemOpen, setNewItemOpen] = useState(false);
 
-  // Re-sync local ordering when the server returns a new activity set.
-  if (module.activities !== serverItems) {
-    setServerItems(module.activities);
-    setItems(module.activities);
-  }
-
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: module.id,
-    disabled: !canEdit,
-  });
-
-  function handleItemDragEnd(e: DragEndEvent) {
-    const { active, over } = e;
-    if (!over || active.id === over.id) return;
-    const oldIndex = items.findIndex((i) => i.id === active.id);
-    const newIndex = items.findIndex((i) => i.id === over.id);
-    if (oldIndex === -1 || newIndex === -1) return;
-    const next = arrayMove(items, oldIndex, newIndex);
-    // Optimistic: reflect the new order immediately, persist in the background.
-    setItems(next);
-    const orderedIds = next.map((i) => i.id);
-    startTransition(async () => {
-      try {
-        await reorderActivitiesAction(courseId, module.id, orderedIds);
-      } catch (err) {
-        toast.error("Something went wrong", { description: (err as Error).message });
-        router.refresh(); // reconcile local order with the server
-      }
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } =
+    useSortable({
+      id: module.id,
+      data: { kind: "module" },
+      disabled: !canEdit || reordering,
     });
-  }
 
   function saveTitle() {
     const next = titleDraft.trim();
@@ -133,6 +160,7 @@ function SortableModule({
       className={cn(
         "rounded-card border border-line bg-surface",
         isDragging && "relative z-10 shadow-lg",
+        isOver && !isDragging && "border-brand",
       )}
     >
       <div className="flex items-center gap-3 border-b border-line px-3 py-2.5">
@@ -215,33 +243,29 @@ function SortableModule({
       </div>
 
       <div className="px-2 py-2">
-        {items.length === 0 ? (
-          <p className="px-2 py-4 text-center text-sm text-ink-4">
-            No content yet{canEdit ? " — add an activity below." : "."}
-          </p>
-        ) : (
-          <DndContext
-            id={`module-activities-${module.id}`}
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            modifiers={DND_MODIFIERS}
-            onDragEnd={handleItemDragEnd}
-          >
-            <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
-              <div className="flex flex-col gap-0.5">
-                {items.map((item) => (
-                  <ItemRow
-                    key={item.id}
-                    item={item}
-                    courseId={courseId}
-                    moduleId={module.id}
-                    canEdit={canEdit}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-        )}
+        <SortableContext
+          items={items.map((item) => item.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          {items.length === 0 ? (
+            <p className="px-2 py-4 text-center text-sm text-ink-4">
+              No content yet{canEdit ? " — add an activity below." : "."}
+            </p>
+          ) : (
+            <div className="flex flex-col gap-0.5">
+              {items.map((item) => (
+                <ItemRow
+                  key={item.id}
+                  item={item}
+                  courseId={courseId}
+                  moduleId={module.id}
+                  canEdit={canEdit}
+                  reordering={reordering}
+                />
+              ))}
+            </div>
+          )}
+        </SortableContext>
 
         {canEdit ? (
           <div className="flex items-center gap-2 px-1 pt-2">
@@ -373,8 +397,18 @@ export function ModuleList({
 }) {
   const router = useRouter();
   const sensors = useDndSensors();
-  const [, startTransition] = useTransition();
+  const [reordering, startTransition] = useTransition();
   const [ordered, setOrdered] = useState<ModuleTree[]>(modules);
+  const orderedRef = useRef(ordered);
+  const dragSnapshot = useRef<ModuleTree[] | null>(null);
+  const crossedModule = useRef(false);
+  const [draggedActivity, setDraggedActivity] = useState<ActivityNode | null>(null);
+  orderedRef.current = ordered;
+
+  function updateOrdered(next: ModuleTree[]) {
+    orderedRef.current = next;
+    setOrdered(next);
+  }
   const [serverModules, setServerModules] = useState<ModuleTree[]>(modules);
 
   // Re-sync local ordering when the server returns a new module set (e.g. after
@@ -384,22 +418,145 @@ export function ModuleList({
     setOrdered(modules);
   }
 
-  function handleDragEnd(e: DragEndEvent) {
-    const { active, over } = e;
-    if (!over || active.id === over.id) return;
-    const oldIndex = ordered.findIndex((m) => m.id === active.id);
-    const newIndex = ordered.findIndex((m) => m.id === over.id);
-    if (oldIndex === -1 || newIndex === -1) return;
-    const next = arrayMove(ordered, oldIndex, newIndex);
-    // Optimistic: reflect the new order immediately, persist in the background.
-    setOrdered(next);
-    const orderedIds = next.map((m) => m.id);
+  function beforeTarget(
+    modules: ModuleTree[],
+    activityId: string,
+    over: NonNullable<DragOverEvent["over"]>,
+    event: DragMoveEvent | DragEndEvent,
+  ): string | null {
+    const destination = targetModule(modules, over.id);
+    if (!destination || destination.id === over.id) return null;
+    const others = destination.activities.filter((item) => item.id !== activityId);
+    const index = others.findIndex((item) => item.id === over.id);
+    if (index < 0) return null;
+    const translated = event.active.rect.current.translated;
+    const pointer =
+      event.activatorEvent instanceof MouseEvent
+        ? event.activatorEvent.clientY + event.delta.y
+        : undefined;
+    const y = pointer ?? (translated ? translated.top + translated.height / 2 : over.rect.top);
+    const after = y > over.rect.top + over.rect.height / 2;
+    return after ? (others[index + 1]?.id ?? null) : (others[index]?.id ?? null);
+  }
+
+  function handleDragStart({ active }: DragStartEvent) {
+    dragSnapshot.current = orderedRef.current;
+    crossedModule.current = false;
+    const source = activityModule(orderedRef.current, active.id);
+    setDraggedActivity(
+      active.data.current?.kind === "activity"
+        ? (source?.activities.find((item) => item.id === active.id) ?? null)
+        : null,
+    );
+  }
+
+  function handleDragMove(event: DragMoveEvent) {
+    const { active, over } = event;
+    if (!over || active.data.current?.kind !== "activity") return;
+    const current = orderedRef.current;
+    const source = activityModule(current, active.id);
+    const destination = targetModule(current, over.id);
+    if (!source || !destination || active.id === over.id) return;
+    if (source.id !== destination.id) crossedModule.current = true;
+    if (source.id === destination.id && !crossedModule.current) return;
+    const next = placeActivity(
+      current,
+      String(active.id),
+      destination.id,
+      beforeTarget(current, String(active.id), over, event),
+    );
+    if (next !== current) updateOrdered(next);
+  }
+
+  function handleDragCancel() {
+    if (dragSnapshot.current) updateOrdered(dragSnapshot.current);
+    dragSnapshot.current = null;
+    crossedModule.current = false;
+    setDraggedActivity(null);
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    const original = dragSnapshot.current ?? orderedRef.current;
+    const current = orderedRef.current;
+    dragSnapshot.current = null;
+    crossedModule.current = false;
+    setDraggedActivity(null);
+    if (!over) {
+      updateOrdered(original);
+      return;
+    }
+    if (active.data.current?.kind === "module") {
+      const oldIndex = original.findIndex((module) => module.id === active.id);
+      const newIndex = original.findIndex((module) => module.id === over.id);
+      if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return;
+      const next = arrayMove(original, oldIndex, newIndex);
+      updateOrdered(next);
+      startTransition(async () => {
+        try {
+          await reorderModulesAction(
+            courseId,
+            next.map((module) => module.id),
+          );
+        } catch (err) {
+          updateOrdered(original);
+          toast.error("Couldn't reorder modules", { description: (err as Error).message });
+          router.refresh();
+        }
+      });
+      return;
+    }
+    const source = activityModule(original, active.id);
+    const currentModule = activityModule(current, active.id);
+    const destination = targetModule(current, over.id);
+    if (!source || !currentModule || !destination) {
+      updateOrdered(original);
+      return;
+    }
+    const next =
+      active.id === over.id
+        ? current
+        : placeActivity(
+            current,
+            String(active.id),
+            destination.id,
+            beforeTarget(current, String(active.id), over, event),
+          );
+    const finalModule = activityModule(next, active.id);
+    if (!finalModule) {
+      updateOrdered(original);
+      return;
+    }
+    const position = finalModule.activities.findIndex((item) => item.id === active.id);
+    const initialPosition = source.activities.findIndex((item) => item.id === active.id);
+    if (source.id === finalModule.id && initialPosition === position) {
+      updateOrdered(original);
+      return;
+    }
+    updateOrdered(next);
     startTransition(async () => {
       try {
-        await reorderModulesAction(courseId, orderedIds);
+        if (source.id === finalModule.id)
+          await reorderActivitiesAction(
+            courseId,
+            source.id,
+            finalModule.activities.map((item) => item.id),
+          );
+        else
+          await moveActivityAction(
+            courseId,
+            source.id,
+            String(active.id),
+            finalModule.id,
+            position,
+          );
       } catch (err) {
-        toast.error("Something went wrong", { description: (err as Error).message });
-        router.refresh(); // reconcile local order with the server
+        updateOrdered(original);
+        toast.error(
+          source.id === finalModule.id ? "Couldn't reorder activities" : "Couldn't move activity",
+          { description: (err as Error).message },
+        );
+        router.refresh();
       }
     });
   }
@@ -424,9 +581,12 @@ export function ModuleList({
         <DndContext
           id="course-modules"
           sensors={sensors}
-          collisionDetection={closestCenter}
+          collisionDetection={curriculumCollisions}
           modifiers={DND_MODIFIERS}
+          onDragStart={handleDragStart}
+          onDragMove={handleDragMove}
           onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
         >
           <SortableContext items={ordered.map((m) => m.id)} strategy={verticalListSortingStrategy}>
             <div className="flex flex-col gap-3">
@@ -437,10 +597,14 @@ export function ModuleList({
                   index={i}
                   courseId={courseId}
                   canEdit={canEdit}
+                  reordering={reordering}
                 />
               ))}
             </div>
           </SortableContext>
+          <DragOverlay dropAnimation={{ duration: 150, easing: "ease" }}>
+            {draggedActivity && <ActivityDragPreview item={draggedActivity} />}
+          </DragOverlay>
         </DndContext>
       ) : (
         <div className="flex flex-col gap-3">
@@ -451,6 +615,7 @@ export function ModuleList({
               index={i}
               courseId={courseId}
               canEdit={canEdit}
+              reordering={reordering}
             />
           ))}
         </div>

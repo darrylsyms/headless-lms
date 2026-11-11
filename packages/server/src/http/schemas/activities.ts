@@ -55,5 +55,10 @@ export const ReorderInput = z.object({
 });
 export type ReorderInput = z.infer<typeof ReorderInput>;
 
+export const MoveActivityInput = z.object({
+  targetModuleId: idSchema,
+  position: z.number().int().min(0).max(500),
+});
+
 export const SaveActivity = saveActivityInputSchema;
 export type SaveActivity = z.infer<typeof SaveActivity>;

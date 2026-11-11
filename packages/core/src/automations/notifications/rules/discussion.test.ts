@@ -158,25 +158,33 @@ function fakeReads(world: World = {}) {
           }
         : null,
     comment: async (_o, commentId) =>
-      commentId === 'cmt_1'
-        ? { orgUserId: 'ou_emma', postId: 'pst_1', activityId: null, parentId: null, body: 'Hi' }
-        : commentId === 'cmt_2'
-          ? {
-              orgUserId: 'ou_james',
-              postId: 'pst_1',
-              activityId: null,
-              parentId: 'cmt_1',
-              body: 'Nice one <@ou_noah>',
-            }
-          : commentId === 'cmt_9'
+      commentId === 'cmt_nested'
+        ? {
+            orgUserId: 'ou_emma',
+            postId: null,
+            activityId: 'act_1',
+            parentId: 'cmt_9',
+            body: 'A reply',
+          }
+        : commentId === 'cmt_1'
+          ? { orgUserId: 'ou_emma', postId: 'pst_1', activityId: null, parentId: null, body: 'Hi' }
+          : commentId === 'cmt_2'
             ? {
                 orgUserId: 'ou_james',
-                postId: null,
-                activityId: 'act_1',
-                parentId: null,
-                body: 'Great lesson',
+                postId: 'pst_1',
+                activityId: null,
+                parentId: 'cmt_1',
+                body: 'Nice one <@ou_noah>',
               }
-            : null,
+            : commentId === 'cmt_9'
+              ? {
+                  orgUserId: 'ou_james',
+                  postId: null,
+                  activityId: 'act_1',
+                  parentId: null,
+                  body: 'Great lesson',
+                }
+              : null,
     activity: async () => ({
       title: 'Rolling r',
       moduleTitle: 'Sounds',
@@ -522,6 +530,20 @@ describe('discussion.comment.created', () => {
       expect.any(Array),
       new Date(AT),
     );
+  });
+
+  it('notifies the author of the exact lesson reply once even when they follow the thread', async () => {
+    const { lists } = await run(
+      created({ ...ACTIVITY_COMMENT, parentId: 'cmt_nested', mentionedOrgUserIds: [] }),
+      {
+        thread: ['ou_emma'],
+        holders: ['ou_emma'],
+        readers: [],
+      },
+    );
+    expect(people(byType(lists, 'comment.created'))).toEqual({
+      ou_emma: ['comment_author', 'thread_participant'],
+    });
   });
 
   it('produces nothing for a pending comment', async () => {

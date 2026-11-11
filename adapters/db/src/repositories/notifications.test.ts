@@ -260,6 +260,16 @@ describe("DrizzleNotificationsRepository list", () => {
     await expect(repo.markRead("org_1", "usr_1", "ntf_x", at)).resolves.toBe(false);
   });
 
+  it("marks only the acting member's in-app notification unread", async () => {
+    const { repo, statements } = capture(() => [["ntf_1"]]);
+    await expect(repo.markUnread("org_1", "usr_1", "ntf_1")).resolves.toBe(true);
+    expect(statements[0]?.text).toContain('"notifications"."user_id" = $');
+    expect(statements[0]?.text).toContain('"notifications"."in_app" = $');
+    expect(statements[0]?.params).toEqual(expect.arrayContaining(["org_1", "usr_1", "ntf_1"]));
+    const missing = capture();
+    await expect(missing.repo.markUnread("org_1", "usr_1", "ntf_other")).resolves.toBe(false);
+  });
+
   it("marks the unread rows matching the filters read", async () => {
     const { repo, statements } = capture(() => [["ntf_1"], ["ntf_2"]]);
     await expect(

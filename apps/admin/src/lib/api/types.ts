@@ -127,6 +127,7 @@ export interface ActivityContent {
  * the editor reads/writes these fields, defaulting anything missing.
  */
 export interface ActivitySettings {
+  lessonDuration?: { kind: "video" | "written"; minutes: number | null; basis?: "video" | "notes" };
   title?: string;
   body?: string;
   published?: boolean;

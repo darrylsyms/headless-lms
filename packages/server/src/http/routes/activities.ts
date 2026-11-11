@@ -11,6 +11,7 @@ import {
   CreateModule,
   ModuleList,
   ModulePathParam,
+  MoveActivityInput,
   ReorderInput,
   SaveActivity,
   UpdateModule,
@@ -173,6 +174,33 @@ export async function activitiesRoutes(app: FastifyInstance, container: Containe
         req.params.courseId,
         req.params.moduleId,
         req.body.orderedIds,
+        actor,
+      );
+    },
+  });
+
+  r.route({
+    method: 'POST',
+    url: '/api/courses/:courseId/modules/:moduleId/activities/:activityId/move',
+    preHandler: app.requireOrgSession,
+    schema: {
+      operationId: 'moveActivity',
+      tags,
+      summary: 'Move an activity to another module',
+      description:
+        'Requires `courses:write`. Preserves the activity and inserts it at the requested position.',
+      params: ActivityPathParam,
+      body: MoveActivityInput,
+      response: { 200: ModuleList, ...refusals(403, 404, 409) },
+    },
+    handler: async (req) => {
+      const actor = await resolveActor(container, req);
+      return content.moveActivity(
+        req.params.courseId,
+        req.params.moduleId,
+        req.params.activityId,
+        req.body.targetModuleId,
+        req.body.position,
         actor,
       );
     },
