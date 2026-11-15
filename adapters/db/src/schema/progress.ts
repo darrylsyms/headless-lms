@@ -15,6 +15,7 @@ import {
 } from "drizzle-orm/pg-core";
 import type { ProgressRecord } from "@headless-lms/core/schemas";
 import { genId } from "@headless-lms/core/shared/id";
+import { activities } from "./content.js";
 import { organizations, orgUsers } from "./organizations.js";
 import type { Expect, NoDrift } from "./drift.js";
 
@@ -53,3 +54,39 @@ export const progressRecords = pgTable(
 );
 
 type _ProgressRecordsDrift = Expect<NoDrift<typeof progressRecords.$inferSelect, ProgressRecord>>;
+
+export const savedActivities = pgTable(
+  "saved_activities",
+  {
+    orgId: text("org_id").notNull(),
+    orgUserId: text("org_user_id").notNull(),
+    activityId: text("activity_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.orgId, t.orgUserId, t.activityId] }),
+    userFk: foreignKey({
+      columns: [t.orgId, t.orgUserId],
+      foreignColumns: [orgUsers.orgId, orgUsers.id],
+    }).onDelete("cascade"),
+    activityFk: foreignKey({
+      columns: [t.orgId, t.activityId],
+      foreignColumns: [activities.orgId, activities.id],
+    }).onDelete("cascade"),
+  }),
+);
+
+export const viewedActivities = pgTable(
+  "viewed_activities",
+  {
+    orgId: text("org_id").notNull(),
+    orgUserId: text("org_user_id").notNull(),
+    activityId: text("activity_id").notNull(),
+    viewedAt: timestamp("viewed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.orgId, t.orgUserId, t.activityId] }),
+    userFk: foreignKey({ columns: [t.orgId, t.orgUserId], foreignColumns: [orgUsers.orgId, orgUsers.id] }).onDelete("cascade"),
+    activityFk: foreignKey({ columns: [t.orgId, t.activityId], foreignColumns: [activities.orgId, activities.id] }).onDelete("cascade"),
+  }),
+);

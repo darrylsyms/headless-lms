@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { activityAssetIds } from "./activity-asset-ids";
+import { activityAssetIds, activityAssetIdsWithArtwork } from "./activity-asset-ids";
 
 const editor = {
   meta: { type: "plate", version: 1 },
@@ -21,5 +21,29 @@ describe("activityAssetIds", () => {
   it("leaves the links alone for content this editor cannot read, or none", () => {
     expect(activityAssetIds(editor, content(["ast_new"], "tiptap"))).toBeUndefined();
     expect(activityAssetIds(editor, undefined)).toBeUndefined();
+  });
+});
+
+describe("activity artwork links", () => {
+  it("keeps artwork attached when lesson content changes", () => {
+    expect(activityAssetIdsWithArtwork(["video"], [], null, "art", true)).toEqual(["video", "art"]);
+  });
+
+  it("replaces artwork while keeping other linked assets", () => {
+    expect(activityAssetIdsWithArtwork(undefined, ["video", "old"], "old", "new", true)).toEqual([
+      "video",
+      "new",
+    ]);
+  });
+
+  it("retains a former artwork link when the content format cannot be inspected", () => {
+    expect(activityAssetIdsWithArtwork(undefined, ["video", "old"], "old", null, false)).toEqual([
+      "video",
+      "old",
+    ]);
+  });
+
+  it("retains artwork also used by the lesson content", () => {
+    expect(activityAssetIdsWithArtwork(["old"], [], "old", null, true)).toEqual(["old"]);
   });
 });

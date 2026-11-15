@@ -1,0 +1,1 @@
+ALTER TABLE "courses" ADD COLUMN "difficulty" text DEFAULT 'all_levels' NOT NULL;

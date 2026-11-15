@@ -135,8 +135,15 @@ export const courses = pgTable(
       .notNull()
       .default("draft"),
     category: text("category").notNull().default(""),
+    difficulty: text("difficulty", {
+      enum: ["all_levels", "beginner", "intermediate", "advanced", "expert"],
+    })
+      .notNull()
+      .default("all_levels"),
     // Media-library asset rendered as the course's cover. Null = no cover.
     thumbnailAssetId: text("thumbnail_asset_id"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
@@ -158,6 +165,7 @@ export const courses = pgTable(
       foreignColumns: [assets.orgId, assets.id],
     }),
     thumbnailIdx: index("courses_thumbnail_idx").on(t.orgId, t.thumbnailAssetId),
+    scheduledIdx: index("courses_scheduled_idx").on(t.scheduledAt).where(sql`${t.scheduledAt} is not null`),
   }),
 );
 
@@ -172,6 +180,7 @@ export const modules = pgTable(
       .$defaultFn(() => genId("module")),
     courseId: text("course_id").notNull(),
     title: text("title").notNull(),
+    description: text("description"),
     seq: integer("seq").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
@@ -210,6 +219,8 @@ export const activities = pgTable(
     // Opaque per-activity blob: title, type, body, completion rule — whatever the
     // content needs. Assets are the one thing kept out of the blob.
     settings: jsonb("settings").$type<Activity["settings"]>(),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
@@ -226,6 +237,7 @@ export const activities = pgTable(
       foreignColumns: [modules.orgId, modules.id, modules.courseId],
     }).onDelete("cascade"),
     seqUq: unique().on(t.orgId, t.moduleId, t.seq),
+    scheduledIdx: index("activities_scheduled_idx").on(t.scheduledAt).where(sql`${t.scheduledAt} is not null`),
   }),
 );
 

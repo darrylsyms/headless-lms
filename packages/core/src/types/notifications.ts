@@ -133,6 +133,8 @@ export interface DeliveryResult {
 }
 
 export interface NotificationFilter {
+  courseId?: string;
+  notificationId?: string;
   scope?: 'org' | 'community';
   communityId?: string;
   includeOrg?: boolean;

@@ -1,4 +1,6 @@
 // Settings tab: every course-level setting, one section per group.
+import { Content } from "@headless-lms/sdk";
+import { authHeaders } from "@/lib/api/server-call";
 import { serverApi } from "@/lib/api/server";
 import { requirePermission } from "@/lib/auth/server-permissions";
 import { courseSettingsOf } from "@/lib/api/compose";
@@ -17,11 +19,12 @@ export default async function CourseSettingsTab({
   const { courseId } = await params;
   await requirePermission("courses:write", courseId);
 
+  const categories = await Content.listCourseCategories(await authHeaders());
   const course = await serverApi.getCourse(courseId);
 
   return (
     <SettingsSurface>
-      <BasicsForm course={course} />
+      <BasicsForm course={course} categories={categories} />
       <ThumbnailField
         courseId={course.id}
         assetId={course.thumbnailAssetId}

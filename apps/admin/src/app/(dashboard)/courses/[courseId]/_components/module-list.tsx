@@ -26,7 +26,7 @@ import {
 } from "@dnd-kit/sortable";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { CSS } from "@dnd-kit/utilities";
-import { Check, FileText, GripVertical, Plus, X } from "lucide-react";
+import { Check, GripVertical, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -38,9 +38,10 @@ import type { ActivityNode, ActivitySettings, ModuleTree } from "@/lib/api/types
 import { activityPublished } from "@/lib/api/compose";
 import { cn } from "@/lib/utils";
 
-import { ItemRow } from "./item-row";
+import { ActivityIcon, ItemRow } from "./item-row";
 import { activityModule, placeActivity, targetModule } from "./curriculum-drag";
 import { NewActivityDialog } from "./new-activity-dialog";
+import { EditModuleDialog } from "./edit-module-dialog";
 import {
   createModuleAction,
   deleteModuleAction,
@@ -85,9 +86,7 @@ function ActivityDragPreview({ item }: { item: ActivityNode }) {
       <span className="grid size-7 shrink-0 place-items-center text-ink-4">
         <GripVertical className="size-4" />
       </span>
-      <span className="grid size-7 shrink-0 place-items-center rounded-md bg-surface-2 text-ink-3">
-        <FileText className="size-4" />
-      </span>
+      <ActivityIcon content={settings.content} />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="truncate text-sm font-medium text-ink">
           {settings.title?.trim() || "Untitled activity"}
@@ -125,6 +124,7 @@ function SortableModule({
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(module.title);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const [newItemOpen, setNewItemOpen] = useState(false);
 
@@ -232,7 +232,7 @@ function SortableModule({
 
         {canEdit ? (
           <RowActions label="Module actions">
-            <DropdownMenuItem onClick={() => setEditingTitle(true)}>Rename</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setEditOpen(true)}>Edit module</DropdownMenuItem>
             <DropdownMenuItem onClick={() => setNewItemOpen(true)}>Add activity</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="danger" onClick={() => setConfirmOpen(true)}>
@@ -241,6 +241,10 @@ function SortableModule({
           </RowActions>
         ) : null}
       </div>
+
+      {module.description && (
+        <p className="px-3 pt-3 text-sm text-ink-3">{module.description}</p>
+      )}
 
       <div className="px-2 py-2">
         <SortableContext
@@ -279,6 +283,7 @@ function SortableModule({
 
       {canEdit ? (
         <>
+          <EditModuleDialog open={editOpen} onOpenChange={setEditOpen} courseId={courseId} module={module} />
           <NewActivityDialog
             open={newItemOpen}
             onOpenChange={setNewItemOpen}

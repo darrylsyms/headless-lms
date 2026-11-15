@@ -157,6 +157,8 @@ export interface CommunitiesService extends CommunityReader {
 }
 
 export interface CourseManagementService {
+  getInsiderFeed(actor: Actor): Promise<{ courseId: string; moduleId: string } | null>;
+  ensureInsiderFeed(actor: Actor): Promise<{ courseId: string; moduleId: string }>;
   listCourses(query: ListCoursesQuery, actor: Actor): Promise<Page<CourseView>>;
   getCourse(id: string, actor: Actor): Promise<CourseView>;
   findCourse(id: string, actor: Actor): Promise<CourseView | null>;
@@ -181,7 +183,7 @@ export interface CourseManagementService {
   reorderModules(courseId: string, orderedIds: string[], actor: Actor): Promise<Module[]>;
   createModule(courseId: string, title: string, actor: Actor): Promise<Module[]>;
   /** @throws NotFoundError when no such module exists in this course. */
-  updateModule(courseId: string, moduleId: string, title: string, actor: Actor): Promise<Module[]>;
+  updateModule(courseId: string, moduleId: string, title: string, description: string | null | undefined, actor: Actor): Promise<Module[]>;
   /** @throws NotFoundError when no such module exists in this course. */
   deleteModule(courseId: string, moduleId: string, actor: Actor): Promise<Module[]>;
   /** @throws NotFoundError when no such module exists in this course. */
@@ -293,8 +295,13 @@ export interface BundlesService {
 }
 
 export interface ContentRepository {
+  getInsiderFeed(orgId: string): Promise<{ courseId: string; moduleId: string } | null>;
+  ensureInsiderFeed(orgId: string): Promise<{ courseId: string; moduleId: string }>;
+  publishDueCourses(now: Date): Promise<Course[]>;
+  publishDueActivities(now: Date): Promise<Activity[]>;
   listCourses(orgId: string, query: ListCoursesQuery, ids?: string[]): Promise<Page<Course>>;
   findCourseById(orgId: string, id: string): Promise<Course | null>;
+  lockCourseById(orgId: string, id: string): Promise<Course | null>;
   createCourse(orgId: string, input: CreateCourseInput, slug: string): Promise<Course>;
   updateCourse(orgId: string, id: string, patch: UpdateCourseInput): Promise<Course | null>;
   patchCourseSettings(
@@ -308,10 +315,11 @@ export interface ContentRepository {
   listActivitiesForCourse(orgId: string, courseId: string): Promise<Activity[]>;
   listActivityAssetsForCourse(orgId: string, courseId: string): Promise<ActivityAsset[]>;
   findActivity(orgId: string, activityId: string): Promise<Activity | null>;
+  lockActivity(orgId: string, activityId: string): Promise<Activity | null>;
   findModule(orgId: string, moduleId: string): Promise<Module | null>;
   reorderModules(orgId: string, courseId: string, orderedIds: string[]): Promise<Module[]>;
   createModule(orgId: string, courseId: string, title: string): Promise<Module[]>;
-  updateModule(orgId: string, courseId: string, moduleId: string, title: string): Promise<Module[]>;
+  updateModule(orgId: string, courseId: string, moduleId: string, title: string, description?: string | null): Promise<Module[]>;
   deleteModule(orgId: string, courseId: string, moduleId: string): Promise<Module[]>;
   reorderActivities(
     orgId: string,

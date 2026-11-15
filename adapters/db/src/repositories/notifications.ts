@@ -72,6 +72,14 @@ function toDelivery(row: DeliveryRow): Delivery {
 
 function listed(orgId: string, userId: string, filter: NotificationFilter): SQL[] {
   const conditions: SQL[] = [eq(n.orgId, orgId), eq(n.userId, userId), eq(n.inApp, true)];
+  if (filter.notificationId) {
+    conditions.push(eq(n.id, filter.notificationId));
+  }
+  if (filter.courseId) {
+    conditions.push(eq(n.parentType, "activity"));
+    conditions.push(eq(n.subjectType, "comment"));
+    conditions.push(sql`exists (select 1 from activities a join comments c on c.org_id = a.org_id and c.activity_id = a.id where a.org_id = ${n.orgId} and a.id = ${n.parentId} and a.course_id = ${filter.courseId} and coalesce(a.settings->>'published', 'true') <> 'false' and c.id = ${n.subjectId} and c.status = 'published')`);
+  }
   if (filter.scope === "org") {
     conditions.push(isNull(n.communityId));
   }

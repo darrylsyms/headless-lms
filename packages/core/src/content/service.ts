@@ -60,7 +60,7 @@ import type {
 } from './types.js';
 import { isDeepStrictEqual } from 'node:util';
 import { contentEvents } from './events.js';
-import { EVENT_LEADS, EVENT_STARTING_SOON_JOB } from './jobs.js';
+import { EVENT_LEADS, EVENT_STARTING_SOON_JOB, PUBLICATION_JOB } from './jobs.js';
 import type { Actor } from '../shared/actor.js';
 import type { AssetFiles, FileUrls } from '../assets/index.js';
 import type { Logger, NewDomainEvent, Scheduler } from '../shared/ports.js';
@@ -353,6 +353,22 @@ export class ContentService
     return course ? this.withThumbnail(course) : null;
   }
 
+  async getInsiderFeed(actor: Actor): Promise<{ courseId: string; moduleId: string } | null> {
+    if (!actor.permissions.anywhere('courses:read')) {
+      throw new ForbiddenError('You need courses:read');
+    }
+    const feed = await this.repo.getInsiderFeed(actor.orgId);
+    if (feed && !actor.permissions.has('courses:read', feed.courseId)) {
+      throw new ForbiddenError('You need courses:read');
+    }
+    return feed;
+  }
+
+  async ensureInsiderFeed(actor: Actor): Promise<{ courseId: string; moduleId: string }> {
+    this.require(actor, 'courses:write');
+    return this.repo.ensureInsiderFeed(actor.orgId);
+  }
+
   async createCourse(input: CreateCourseInput, actor: Actor): Promise<CourseView> {
     this.require(actor, 'courses:write');
     const orgId = actor.orgId;
@@ -381,7 +397,30 @@ export class ContentService
       'A course',
     );
     const course = await this.uow.run(async ({ content, outbox }) => {
-      const updated = await content.updateCourse(orgId, id, patch);
+      const existing = await content.lockCourseById(orgId, id);
+      if (!existing) {
+        throw new NotFoundError('Course', id);
+      }
+      if (patch.publishedAt !== undefined && (existing.status !== 'published' || patch.status === 'draft')) {
+        throw new InvalidInputError('Publish date can only be edited while the course is published');
+      }
+      if (patch.publishedAt !== undefined && new Date(patch.publishedAt).getTime() > Date.now()) {
+        throw new InvalidInputError('Publish date cannot be in the future');
+      }
+      if (patch.scheduledAt && (existing.status !== 'draft' || patch.status === 'published')) {
+        throw new InvalidInputError('Only draft courses can be scheduled');
+      }
+      if (patch.scheduledAt && new Date(patch.scheduledAt).getTime() <= Date.now()) {
+        throw new InvalidInputError('Scheduled publication must be in the future');
+      }
+      const effectivePatch = { ...patch };
+      if (patch.status === 'published' && existing.scheduledAt) {
+        effectivePatch.scheduledAt = null;
+      }
+      if (patch.status === 'published' && existing.status === 'draft' && !existing.publishedAt) {
+        effectivePatch.publishedAt = new Date().toISOString();
+      }
+      const updated = await content.updateCourse(orgId, id, effectivePatch);
       if (!updated) {
         this.logger.warn('course update rejected — not found', { orgId, courseId: id });
         throw new NotFoundError('Course', id);
@@ -396,7 +435,41 @@ export class ContentService
       actorId: actor.id,
     });
     await this.syncThumbnail(course);
+    if (patch.scheduledAt !== undefined || patch.status === 'published') {
+      await this.syncPublicationTimer(orgId, 'course', course.id, course.scheduledAt);
+    }
     return this.withThumbnail(course);
+  }
+
+  private async syncPublicationTimer(orgId: string, kind: 'course' | 'activity', id: string, at: Date | null): Promise<void> {
+    const key = `${orgId}:${kind}:${id}`;
+    try {
+      if (at) {
+        await this.scheduler.at(PUBLICATION_JOB, at, key, null);
+      } else {
+        await this.scheduler.cancel(PUBLICATION_JOB, key);
+      }
+    } catch (err) {
+      this.logger.warn('publication timer could not be updated', { orgId, kind, id, err });
+    }
+  }
+
+  async publishDue(now: Date): Promise<void> {
+    await this.uow.run(async ({ content, outbox }) => {
+      const courses = await content.publishDueCourses(now);
+      const activities = await content.publishDueActivities(now);
+      const events: NewDomainEvent[] = courses.map((course) => contentEvents.courseUpdated.make({ orgId: course.orgId, data: course }));
+      for (const activity of activities) {
+        events.push(contentEvents.activityUpdated.make({ orgId: activity.orgId, data: activity }));
+        const course = await content.findCourseById(activity.orgId, activity.courseId);
+        if (course?.status === 'published') {
+          events.push(contentEvents.activityPublished.make({ orgId: activity.orgId, data: { activityId: activity.id, moduleId: activity.moduleId, courseId: activity.courseId } }));
+        }
+      }
+      if (events.length) {
+        await outbox.append(events);
+      }
+    });
   }
 
   async patchCourseSettings(
@@ -431,6 +504,9 @@ export class ContentService
       if (!course) {
         this.logger.warn('course delete rejected — not found', { orgId, courseId: id });
         throw new NotFoundError('Course', id);
+      }
+      if ((await content.getInsiderFeed(orgId))?.courseId === id) {
+        throw new ConflictError('The Insider Feed cannot be deleted as a course');
       }
       const linked = await content.spacesLinkingContent(orgId, id);
       const ok = await content.deleteCourse(orgId, id);
@@ -533,6 +609,7 @@ export class ContentService
     courseId: string,
     moduleId: string,
     title: string,
+    description: string | null | undefined,
     actor: Actor,
   ): Promise<Module[]> {
     this.require(actor, 'courses:write', courseId);
@@ -547,7 +624,9 @@ export class ContentService
         });
         throw new NotFoundError('Module', moduleId);
       }
-      const all = await content.updateModule(orgId, courseId, moduleId, title);
+      const all = description === undefined
+        ? await content.updateModule(orgId, courseId, moduleId, title)
+        : await content.updateModule(orgId, courseId, moduleId, title, description);
       const module = all.find((m) => m.id === moduleId);
       if (!module) {
         throw new NotFoundError('Module', moduleId);
@@ -562,6 +641,8 @@ export class ContentService
   async deleteModule(courseId: string, moduleId: string, actor: Actor): Promise<Module[]> {
     this.require(actor, 'courses:write', courseId);
     const orgId = actor.orgId;
+    const feed = await this.repo.getInsiderFeed(orgId);
+    if (feed?.courseId === courseId && feed.moduleId === moduleId) {throw new ConflictError('The Insider Feed module cannot be deleted');}
     const modules = await this.uow.run(async ({ content, outbox }) => {
       // Snapshot before the delete — the event carries the last known state.
       const module = await content.findModule(orgId, moduleId);
@@ -639,6 +720,27 @@ export class ContentService
   ): Promise<Module[]> {
     this.require(actor, 'courses:write', courseId);
     const orgId = actor.orgId;
+    const settings = input.settings;
+    const thumbnail = settings && typeof settings === 'object' && !Array.isArray(settings)
+      ? settings.thumbnailAssetId
+      : undefined;
+    if (thumbnail !== undefined && thumbnail !== null && (typeof thumbnail !== 'string' || !thumbnail)) {
+      throw new InvalidInputError('Activity thumbnail must be an image asset');
+    }
+    if (typeof thumbnail === 'string') {
+      const links = input.assetIds ?? (activityId
+        ? (await this.repo.listActivityAssetsForCourse(orgId, courseId))
+            .filter((link) => link.activityId === activityId)
+            .map((link) => link.assetId)
+        : []);
+      if (!links.includes(thumbnail)) {
+        throw new InvalidInputError('Activity thumbnail must be attached to the activity');
+      }
+      const ready = await this.files.readyFiles(orgId, [thumbnail]);
+      if (!ready[thumbnail]?.contentType.startsWith('image/')) {
+        throw new ConflictError('Activity thumbnail must be a ready image');
+      }
+    }
     await this.assertAttachable(
       actor,
       courseId,
@@ -648,8 +750,10 @@ export class ContentService
     );
     const { modules, activity } = await this.uow.run(async ({ content, outbox }) => {
       let wasPublished = false;
+      let previousPublishedAt: Date | null = null;
+      let previousScheduledAt: Date | null = null;
       if (activityId) {
-        const existing = await content.findActivity(orgId, activityId);
+        const existing = await content.lockActivity(orgId, activityId);
         if (!existing || existing.moduleId !== moduleId || existing.courseId !== courseId) {
           this.logger.warn('activity update rejected — not found in module', {
             orgId,
@@ -660,6 +764,8 @@ export class ContentService
           throw new NotFoundError('Activity', activityId);
         }
         wasPublished = isPublishedActivity(existing.settings);
+        previousPublishedAt = existing.publishedAt;
+        previousScheduledAt = existing.scheduledAt;
       } else {
         const module = await content.findModule(orgId, moduleId);
         if (!module || module.courseId !== courseId) {
@@ -672,11 +778,31 @@ export class ContentService
         }
       }
 
+      const willBePublished = isPublishedActivity(input.settings);
+      if (input.publishedAt !== undefined && (!activityId || !wasPublished || !willBePublished)) {
+        throw new InvalidInputError('Publish date can only be edited while the activity is published');
+      }
+      if (input.publishedAt !== undefined && new Date(input.publishedAt).getTime() > Date.now()) {
+        throw new InvalidInputError('Publish date cannot be in the future');
+      }
+      if (input.scheduledAt && (wasPublished || willBePublished)) {
+        throw new InvalidInputError('Only draft activities can be scheduled');
+      }
+      if (input.scheduledAt && new Date(input.scheduledAt).getTime() <= Date.now()) {
+        throw new InvalidInputError('Scheduled publication must be in the future');
+      }
+      const effectiveInput = { ...input };
+      if (willBePublished && previousScheduledAt) {
+        effectiveInput.scheduledAt = null;
+      }
+      if (!wasPublished && willBePublished && !previousPublishedAt) {
+        effectiveInput.publishedAt = new Date().toISOString();
+      }
       const { modules: all, activity: saved } = await content.saveActivity(
         orgId,
         courseId,
         moduleId,
-        input,
+        effectiveInput,
         activityId ?? undefined,
       );
       const events: NewDomainEvent[] = [
@@ -698,6 +824,9 @@ export class ContentService
       await outbox.append(events);
       return { modules: all, activity: saved };
     });
+    if (input.scheduledAt !== undefined || (activityId && isPublishedActivity(activity.settings))) {
+      await this.syncPublicationTimer(orgId, 'activity', activity.id, activity.scheduledAt);
+    }
     this.logger.info(activityId ? 'activity updated' : 'activity created', {
       orgId,
       courseId,

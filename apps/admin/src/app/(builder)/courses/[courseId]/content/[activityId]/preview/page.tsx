@@ -14,9 +14,9 @@ export default async function ActivityPreviewPage({
   searchParams,
 }: {
   params: Promise<{ courseId: string; activityId: string }>;
-  searchParams: Promise<{ panel?: string }>;
+  searchParams: Promise<{ panel?: string; feed?: string }>;
 }) {
-  const [{ courseId, activityId }, { panel }] = await Promise.all([params, searchParams]);
+  const [{ courseId, activityId }, { panel, feed }] = await Promise.all([params, searchParams]);
 
   const loaded = await loadActivity(courseId, activityId);
   if (!loaded) return <ForbiddenView description="You don't have access to manage this course." />;
@@ -27,7 +27,10 @@ export default async function ActivityPreviewPage({
   const stored = settings.content;
   const { Renderer, meta } = editorModule;
   const panelParam = panelFromParam(panel);
-  const editorHref = `/courses/${courseId}/content/${activityId}${panelParam ? `?panel=${panelParam}` : ""}`;
+  const query = new URLSearchParams();
+  if (panelParam) query.set("panel", panelParam);
+  if (feed === "1") query.set("feed", "1");
+  const editorHref = `/courses/${courseId}/content/${activityId}${query.size ? `?${query}` : ""}`;
 
   return (
     <div className="flex min-h-dvh flex-col bg-surface-2">

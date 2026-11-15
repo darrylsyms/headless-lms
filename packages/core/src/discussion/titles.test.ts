@@ -47,6 +47,8 @@ const activity: Activity = {
   moduleId: 'mod_1',
   courseId: 'crs_1',
   seq: 0,
+  publishedAt: null,
+    scheduledAt: null,
   settings: { title: 'Lesson 3' },
   createdAt: AT,
   updatedAt: AT,

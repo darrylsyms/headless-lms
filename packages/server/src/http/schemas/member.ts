@@ -85,3 +85,12 @@ export const CourseProgress = z.object({
   positions: z.record(z.string(), z.unknown()),
 });
 export type CourseProgress = z.infer<typeof CourseProgress>;
+
+export const SavedActivities = z.object({ saved: z.array(z.string()) });
+export const SetSavedActivity = z.object({ activity: z.string(), saved: z.boolean() }).strict();
+
+export const RecentActivityViews = z.array(z.object({ activityId: z.string(), courseId: z.string(), title: z.string(), kind: z.enum(['lesson', 'song', 'insider']), thumbnailUrl: z.string().nullable(), viewedAt: z.string(), accessible: z.boolean() }));
+export const RecordActivityView = z.object({ activity: z.string() }).strict();
+
+export const AllSavedActivities = z.array(z.object({ activityId: z.string(), courseId: z.string(), title: z.string(), kind: z.enum(['lesson', 'song', 'insider']), thumbnailUrl: z.string().nullable(), accessible: z.boolean() }));
+export const SavedActivityParam = z.object({ activityId: z.string() });

@@ -11,26 +11,31 @@ import { authHeaders } from "@/lib/api/server-call";
 export async function approveCommentAction(commentId: string): Promise<void> {
   await Discussion.publishComment({ commentId, status: "published" }, await authHeaders());
   revalidatePath("/courses/[courseId]/discussion", "page");
+  revalidatePath("/insider-feed/comments");
 }
 
 export async function moderateRemoveCommentAction(commentId: string): Promise<void> {
   await Discussion.moderateRemoveComment({ commentId }, await authHeaders());
   revalidatePath("/courses/[courseId]/discussion", "page");
+  revalidatePath("/insider-feed/comments");
 }
 
 export async function restoreCommentAction(commentId: string): Promise<void> {
   await Discussion.publishComment({ commentId, status: "published" }, await authHeaders());
   revalidatePath("/courses/[courseId]/discussion", "page");
+  revalidatePath("/insider-feed/comments");
 }
 
 export async function replyToCommentAction(commentId: string, body: string): Promise<void> {
   await Discussion.replyToComment({ commentId, body }, await authHeaders());
   revalidatePath("/courses/[courseId]/discussion", "page");
+  revalidatePath("/insider-feed/comments");
 }
 
 export async function resolveCommentReportsAction(commentId: string): Promise<void> {
   await Discussion.dismissCommentReports({ commentId }, await authHeaders());
   revalidatePath("/courses/[courseId]/discussion", "page");
+  revalidatePath("/insider-feed/comments");
 }
 
 /** Selection actions. One request per comment — there is no batch endpoint —
@@ -43,6 +48,7 @@ export async function bulkApproveCommentsAction(commentIds: string[]): Promise<v
     ),
   );
   revalidatePath("/courses/[courseId]/discussion", "page");
+  revalidatePath("/insider-feed/comments");
 }
 
 export async function bulkRemoveCommentsAction(commentIds: string[]): Promise<void> {
@@ -51,4 +57,5 @@ export async function bulkRemoveCommentsAction(commentIds: string[]): Promise<vo
     commentIds.map((commentId) => Discussion.moderateRemoveComment({ commentId }, headers)),
   );
   revalidatePath("/courses/[courseId]/discussion", "page");
+  revalidatePath("/insider-feed/comments");
 }

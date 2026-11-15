@@ -13,6 +13,8 @@ import type {
   ContentAccessReader,
   CourseReader,
   ProgressRepository,
+  RecentActivityView,
+  SavedActivityView,
   ProgressService,
   ProgressUnitOfWork,
   ProgressWriteScope,
@@ -54,17 +56,6 @@ function mergeReports(
   return { map, changed, claimed };
 }
 
-/** The completion-rule seam. Only `manual` ships: no authored rule → the
- *  learner's claim decides. Authored rules are never satisfied until their
- *  evaluators exist. Future rules evaluate against the accumulated state map. */
-function completionSatisfied(settings: unknown, claimed: boolean): boolean {
-  const rule = (settings as { completion?: { rule?: string } } | null)?.completion?.rule;
-  if (!rule || rule === 'manual') {
-    return claimed;
-  }
-  return false;
-}
-
 type Reporter = ReportProgressInput & { orgUserId: string };
 
 export type ProgressServiceParams = {
@@ -93,6 +84,98 @@ export class ProgressServiceImpl implements ProgressService {
     this.logger = params.logger ?? noopLogger;
   }
 
+  private async canOpenCourse(courseId: string, actor: Actor): Promise<boolean> {
+    const course = await this.content.findCourse(courseId, this.system.systemActor(actor.orgId));
+    return (
+      course !== null &&
+      (actor.permissions.has('courses:read', courseId) ||
+        (course.status === 'published' &&
+          (await this.access.hasAccess(actor.orgId, actor.id, courseId))))
+    );
+  }
+
+  private async accessibleActivities(courseId: string, actor: Actor): Promise<Activity[]> {
+    if (!(await this.canOpenCourse(courseId, actor))) {
+      throw new NotFoundError('Course', courseId);
+    }
+    const system = this.system.systemActor(actor.orgId);
+    return (await this.content.listCourseActivities(courseId, system)).filter((activity) =>
+      isActivityPublished(activity.settings),
+    );
+  }
+
+  async recordView(activityId: string, actor: Actor): Promise<void> {
+    const activity = await this.content.getActivity(activityId, this.system.systemActor(actor.orgId));
+    if (!activity || !isActivityPublished(activity.settings) || !(await this.canOpenCourse(activity.courseId, actor))) {
+      throw new NotFoundError('Activity', activityId);
+    }
+    await this.repo.recordView(actor.orgId, actor.id, activityId);
+  }
+
+  async listRecentViews(actor: Actor): Promise<RecentActivityView[]> {
+    const views = await this.repo.listRecentViews(actor.orgId, actor.id);
+    const system = this.system.systemActor(actor.orgId);
+    const feed = await this.content.getInsiderFeed(system);
+    const items = await Promise.all(views.map(async (view) => {
+      const activity = await this.content.getActivity(view.activityId, system);
+      if (!activity) {
+        return null;
+      }
+      const course = await this.content.findCourse(activity.courseId, system);
+      if (!course) {
+        return null;
+      }
+      const settings = activity.settings as { title?: string; published?: boolean } | null;
+      return { activityId: activity.id, courseId: activity.courseId, title: settings?.title?.trim() || 'Untitled activity', kind: activity.courseId === feed?.courseId ? 'insider' as const : course.settings?.songLibrary ? 'song' as const : 'lesson' as const, thumbnailUrl: course.status === 'published' ? course.thumbnailUrl ?? null : null, viewedAt: view.viewedAt.toISOString(), accessible: isActivityPublished(activity.settings) && await this.canOpenCourse(activity.courseId, actor) };
+    }));
+    return items.filter((item): item is RecentActivityView => item !== null);
+  }
+
+  async listAllSaved(actor: Actor): Promise<SavedActivityView[]> {
+    const ids = await this.repo.listSavedIds(actor.orgId, actor.id);
+    const system = this.system.systemActor(actor.orgId);
+    const feed = await this.content.getInsiderFeed(system);
+    const items = await Promise.all(ids.map(async (id) => {
+      const activity = await this.content.getActivity(id, system);
+      if (!activity) {
+        return null;
+      }
+      const course = await this.content.findCourse(activity.courseId, system);
+      if (!course) {
+        return null;
+      }
+      const settings = activity.settings as { title?: string } | null;
+      return { activityId: activity.id, courseId: activity.courseId, title: settings?.title?.trim() || 'Untitled activity', kind: activity.courseId === feed?.courseId ? 'insider' as const : course.settings?.songLibrary ? 'song' as const : 'lesson' as const, thumbnailUrl: course.status === 'published' ? course.thumbnailUrl ?? null : null, accessible: isActivityPublished(activity.settings) && await this.canOpenCourse(activity.courseId, actor) };
+    }));
+    return items.filter((item): item is SavedActivityView => item !== null);
+  }
+
+  async removeSaved(activityId: string, actor: Actor): Promise<void> {
+    await this.repo.setSaved(actor.orgId, actor.id, activityId, false);
+  }
+
+  async listSaved(courseId: string, actor: Actor): Promise<string[]> {
+    const activities = await this.accessibleActivities(courseId, actor);
+    return this.repo.savedAmong(
+      actor.orgId,
+      actor.id,
+      activities.map((activity) => activity.id),
+    );
+  }
+
+  async setSaved(
+    courseId: string,
+    activityId: string,
+    saved: boolean,
+    actor: Actor,
+  ): Promise<void> {
+    const activities = await this.accessibleActivities(courseId, actor);
+    if (!activities.some((activity) => activity.id === activityId)) {
+      throw new NotFoundError('Activity', activityId);
+    }
+    await this.repo.setSaved(actor.orgId, actor.id, activityId, saved);
+  }
+
   async report(report: ReportProgressInput, actor: Actor): Promise<ProgressRecord> {
     const orgId = actor.orgId;
     const input: Reporter = { ...report, orgUserId: actor.id };
@@ -102,12 +185,7 @@ export class ProgressServiceImpl implements ProgressService {
       throw new NotFoundError('Activity', input.activityId);
     }
     const courseId = activity.courseId;
-    const course = await this.content.findCourse(courseId, system);
-    const opens =
-      course !== null &&
-      (actor.permissions.has('courses:read', courseId) ||
-        (course.status === 'published' &&
-          (await this.access.hasAccess(orgId, actor.id, courseId))));
+    const opens = await this.canOpenCourse(courseId, actor);
     if (!opens) {
       this.logger.warn('progress report refused — course not open', {
         orgId,
@@ -133,7 +211,7 @@ export class ProgressServiceImpl implements ProgressService {
       if (state.changed) {
         record = (await scope.progress.update(orgId, record.id, { position: state.map })) ?? record;
       }
-      if (!record.completedAt && completionSatisfied(activity.settings, state.claimed)) {
+      if (!record.completedAt && state.claimed) {
         record =
           (await scope.progress.update(orgId, record.id, {
             completedAt: new Date(),

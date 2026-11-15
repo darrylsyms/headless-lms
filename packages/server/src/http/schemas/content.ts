@@ -4,6 +4,7 @@
 import { z } from 'zod';
 import {
   courseSettingsSchema,
+  courseDifficultySchema,
   courseStatusSchema,
   courseViewSchema,
   idSchema,
@@ -26,6 +27,7 @@ export const CreateCourse = z.object({
   title: z.string().trim().min(1).max(200),
   description: z.string().max(5_000).default(''),
   category: z.string().trim().max(100).default(''),
+  difficulty: courseDifficultySchema.default('all_levels'),
 });
 export type CreateCourse = z.infer<typeof CreateCourse>;
 
@@ -33,6 +35,9 @@ export const UpdateCourse = z.object({
   title: z.string().trim().min(1).max(200).optional(),
   description: z.string().max(5_000).optional(),
   category: z.string().trim().max(100).optional(),
+  difficulty: courseDifficultySchema.optional(),
+  publishedAt: z.iso.datetime().optional(),
+  scheduledAt: z.iso.datetime().nullable().optional(),
   status: CourseStatus.optional(),
   /** null clears the cover. */
   thumbnailAssetId: idSchema.nullable().optional(),

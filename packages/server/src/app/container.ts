@@ -7,6 +7,8 @@ import {
   DrizzleAutomationsRepository,
   DrizzleConnectionsRepository,
   DrizzleContentRepository,
+  DrizzleCourseCategoriesRepository,
+  DrizzleInsiderCategoriesRepository,
   DrizzleCredentialStore,
   DrizzleAdminRepository,
   DrizzleDigestRunRepository,
@@ -47,13 +49,15 @@ import {
 } from '@headless-lms/adapter-defaults/logging';
 import { StorageAdapter } from '@headless-lms/adapter-defaults/storage';
 import { PlainBodyParser } from '@headless-lms/adapter-defaults/body';
-import { BetterAuth } from '@headless-lms/adapter-auth';
+import { BetterAuth, type CreateAuthOptions } from '@headless-lms/adapter-auth';
 
 import {
   CommunityNotificationCategories,
   ContentItemTitles,
   ContentService,
+  CourseCategories,
   contentJobs,
+  contentRecurringJobs,
 } from '@headless-lms/core/content';
 import {
   EntitlementsServiceImpl,
@@ -164,6 +168,7 @@ export interface BuildContainerOptions {
   /** Installation's plugins folder, scanned by loadIntegrations. Absent → no integrations. */
   pluginsDir?: string;
   adapters?: AdapterOverrides;
+  externalIdentity?: (db: ReturnType<typeof createDb>) => Promise<CreateAuthOptions['externalIdentity']>;
   roles?: readonly RoleDefinition[];
   /** Live chat hub timings. Absent → the defaults (1 s state flush, 30 s session check). */
   live?: ChatHubOptions;
@@ -251,6 +256,8 @@ export interface Container {
   identity: IdentityServiceImpl;
   organizations: OrganizationServiceImpl;
   content: ContentService;
+  courseCategories: CourseCategories;
+  insiderCategories: CourseCategories;
   entitlements: EntitlementsServiceImpl;
   progress: ProgressServiceImpl;
   discussion: DiscussionServiceImpl;
@@ -804,7 +811,7 @@ export async function buildContainer(
   automationEngine.registerJobs(
     [
       ...discussionJobs({ posts, digests, logger: discussionLogger }),
-      ...contentJobs({ events: content, logger: contentLogger }),
+      ...contentJobs({ events: content, publications: content, logger: contentLogger }),
       ...entitlementsJobs({ grants: entitlements }),
       ...assetsJobs({ assets, orgs: organizations, logger: assetsLogger }),
       ...notificationJobs({
@@ -813,7 +820,7 @@ export async function buildContainer(
         logger: automationsLogger,
       }),
     ],
-    [...discussionRecurringJobs, ...entitlementsRecurringJobs, ...assetsRecurringJobs],
+    [...discussionRecurringJobs, ...contentRecurringJobs, ...entitlementsRecurringJobs, ...assetsRecurringJobs],
   );
 
   const eventBus = new InMemoryEventBus();
@@ -854,6 +861,7 @@ export async function buildContainer(
   }
   const auth: BetterAuth = new BetterAuth({
     db,
+    externalIdentity: await options?.externalIdentity?.(db),
     baseUrl: config.authBaseURL,
     mcp: {
       oauthEnabled: mcp.oauthEnabled,
@@ -958,6 +966,8 @@ export async function buildContainer(
     // Better Auth owns org writes; the same instance fulfils the OrgAdmin port.
     orgProvider: auth,
     content,
+    courseCategories: new CourseCategories(new DrizzleCourseCategoriesRepository(db)),
+    insiderCategories: new CourseCategories(new DrizzleInsiderCategoriesRepository(db)),
     entitlements,
     progress,
     discussion,

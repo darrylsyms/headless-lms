@@ -16,18 +16,6 @@ import { coursesColumns } from "./courses-columns";
 import { CourseFormDialog } from "./_components/course-form-dialog";
 import { setCoursePublishedAction, deleteCourseAction } from "./actions";
 
-/** The eight fixed course categories, shared with the create/edit form sheet. */
-const CATEGORY_OPTIONS = [
-  "Design",
-  "Engineering",
-  "Product",
-  "Marketing",
-  "Data",
-  "Leadership",
-  "Finance",
-  "Operations",
-].map((c) => ({ label: c, value: c }));
-
 /** Deep-equal on the small, JSON-safe `ListParams` shape (both sides built by
  *  the same `parseListParams`, so key order is stable). */
 function sameParams(a: ListParams, b: ListParams): boolean {
@@ -39,7 +27,9 @@ function CoursesTableInner({
   rows,
   total,
   params,
+  categories,
 }: {
+  categories: string[];
   rows: Course[];
   total: number;
   params: ListParams;
@@ -168,7 +158,7 @@ function CoursesTableInner({
           {
             columnId: "category",
             title: "Category",
-            options: CATEGORY_OPTIONS,
+            options: categories.map((c) => ({ label: c, value: c })),
           },
         ]}
         emptyTitle="No courses yet"
@@ -187,7 +177,12 @@ function CoursesTableInner({
       />
 
       {/* Opened only via gated triggers (create button / Edit menu item). */}
-      <CourseFormDialog open={dialogOpen} onOpenChange={setDialogOpen} course={editing} />
+      <CourseFormDialog
+        categories={categories}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        course={editing}
+      />
 
       <ConfirmDialog
         open={toDelete !== null}
@@ -213,7 +208,12 @@ function CoursesTableInner({
   );
 }
 
-export function CoursesTable(props: { rows: Course[]; total: number; params: ListParams }) {
+export function CoursesTable(props: {
+  categories: string[];
+  rows: Course[];
+  total: number;
+  params: ListParams;
+}) {
   // `useDataTable` reads `useSearchParams()`, which requires a Suspense boundary.
   return (
     <Suspense fallback={null}>

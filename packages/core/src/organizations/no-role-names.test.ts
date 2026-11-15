@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
@@ -26,7 +26,7 @@ interface LintMessage {
 async function lint(dir: string, file: string): Promise<number[]> {
   const base = `${root}${dir}`;
   const require = createRequire(`${base}package.json`);
-  const { ESLint } = (await import(pathToFileURL(require.resolve('eslint')).href)) as {
+  const { ESLint } = require('eslint') as {
     ESLint: new (options: { cwd: string }) => {
       lintText(code: string, options: { filePath: string }): Promise<{ messages: LintMessage[] }[]>;
     };

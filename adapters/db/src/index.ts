@@ -26,3 +26,5 @@ export * from "./repositories/progress.js";
 export * from "./repositories/settings.js";
 export * from "./repositories/subscriptions.js";
 export * from "./repositories/admin.js";
+export * from './repositories/course-categories.js';
+export * from './repositories/insider-categories.js';

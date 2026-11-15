@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import {
@@ -17,6 +18,12 @@ export async function memberCoursesRoutes(
 ): Promise<void> {
   const r = app.withTypeProvider<ZodTypeProvider>();
   const member = container.reporting.member;
+
+  r.route({
+    method: 'GET', url: '/api/member/insider-feed', preHandler: app.requireOrgSession,
+    schema: { operationId: 'getMemberInsiderFeed', tags: ['Content'], summary: 'Find the Insider Feed you can open', response: { 200: z.object({ courseId: z.string(), moduleId: z.string() }).nullable(), ...refusals(403, 404) } },
+    handler: async (req) => member.insiderFeed(await resolveActor(container, req)),
+  });
 
   r.route({
     method: 'GET',

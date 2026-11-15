@@ -38,6 +38,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { publicationDay, publicationInstant, publicationIsFuture, publicationTime } from "@/lib/publication-date";
 import { activityPublished } from "@/lib/api/compose";
 import type { ActivityNode, ActivitySettings, ModuleTree } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
@@ -60,6 +61,10 @@ const schema = z.object({
     .min(1, "Give this activity a title")
     .max(120, "Keep the title under 120 characters"),
   published: z.boolean(),
+  publishedAt: z.string(),
+  publishedTime: z.string(),
+  scheduleDay: z.string(),
+  scheduleTime: z.string(),
   completion: z.enum(["view", "video", "manual"]),
   transcriptDownloads: z.enum(["inherit", "always", "never"]),
   comments: z.enum(["inherit", "always", "never"]),
@@ -67,11 +72,15 @@ const schema = z.object({
 
 export type ActivityFormValues = z.infer<typeof schema>;
 
-function toDefaults(settings: ActivitySettings): ActivityFormValues {
+function toDefaults(settings: ActivitySettings, publishedAt: string | null, scheduledAt: string | null): ActivityFormValues {
   return {
     title: settings.title ?? "",
     published: activityPublished(settings),
-    completion: settings.completion ?? "view",
+    publishedAt: publicationDay(publishedAt),
+    publishedTime: publicationTime(publishedAt),
+    scheduleDay: publicationDay(scheduledAt),
+    scheduleTime: publicationTime(scheduledAt),
+    completion: "manual",
     transcriptDownloads: settings.transcriptDownloads ?? "inherit",
     comments: settings.comments ?? "inherit",
   };
@@ -118,6 +127,7 @@ export function ActivityBuilder({
   initialPanel,
   courseTranscriptDownloads,
   courseCommentsEnabled,
+  isFeed = false,
 }: {
   course: { id: string; title: string };
   modules: ModuleTree[];
@@ -129,6 +139,7 @@ export function ActivityBuilder({
   initialPanel: BuilderPanel | "none" | undefined;
   courseTranscriptDownloads: boolean;
   courseCommentsEnabled: boolean;
+  isFeed?: boolean;
 }) {
   const router = useRouter();
   const isDesktop = useIsDesktop();
@@ -136,7 +147,7 @@ export function ActivityBuilder({
 
   const [panel, setPanel] = useState<BuilderPanel | null>(() => {
     if (initialPanel === "none") return null;
-    return PANELS.find((p) => p.id === initialPanel)?.id ?? DEFAULT_PANEL;
+    return PANELS.find((p) => p.id === initialPanel && (!isFeed || p.id !== "curriculum"))?.id ?? (isFeed && !hasBlockLibrary ? "settings" : DEFAULT_PANEL);
   });
   const [sheetPanel, setSheetPanel] = useState<BuilderPanel | null>(null);
   const [toolbarEl, setToolbarEl] = useState<HTMLDivElement | null>(null);
@@ -150,7 +161,7 @@ export function ActivityBuilder({
 
   const form = useForm<ActivityFormValues>({
     resolver: zodResolver(schema),
-    defaultValues: toDefaults((activity.settings ?? {}) as ActivitySettings),
+    defaultValues: toDefaults((activity.settings ?? {}) as ActivitySettings, activity.publishedAt, activity.scheduledAt),
   });
   const {
     register,
@@ -159,6 +170,15 @@ export function ActivityBuilder({
     formState: { errors, isDirty },
   } = form;
   const { ref: registerTitleRef, ...titleField } = register("title");
+
+  useEffect(() => {
+    if (!isDirty) {
+      form.setValue("publishedAt", publicationDay(activity.publishedAt));
+      form.setValue("publishedTime", publicationTime(activity.publishedAt));
+      form.setValue("scheduleDay", publicationDay(activity.scheduledAt));
+      form.setValue("scheduleTime", publicationTime(activity.scheduledAt));
+    }
+  }, [activity.publishedAt, activity.scheduledAt, isDirty, form]);
 
   const dirty = isDirty || contentDirty;
   const base = `/courses/${course.id}/content`;
@@ -171,8 +191,8 @@ export function ActivityBuilder({
   const next = index >= 0 ? ordered[index + 1] : undefined;
 
   const hrefFor = useCallback(
-    (id: string) => `${base}/${id}?panel=${panel ?? "none"}`,
-    [base, panel],
+    (id: string) => `${base}/${id}?panel=${panel ?? "none"}${isFeed ? "&feed=1" : ""}`,
+    [base, panel, isFeed],
   );
 
   useEffect(() => {
@@ -209,7 +229,43 @@ export function ActivityBuilder({
     const values = submitted.values;
     if (!values) return false;
 
-    const patch: Partial<ActivitySettings> = isDirty ? { ...values } : {};
+    const { publishedAt, publishedTime, scheduleDay, scheduleTime, ...settingsValues } = values;
+    let scheduledAt: string | null | undefined;
+    if (
+      !activityPublished((activity.settings ?? {}) as ActivitySettings) &&
+      !values.published &&
+      (scheduleDay !== publicationDay(activity.scheduledAt) ||
+        scheduleTime !== publicationTime(activity.scheduledAt))
+    ) {
+      if (!scheduleDay && !scheduleTime) {
+        scheduledAt = null;
+      } else if (!scheduleDay || !scheduleTime) {
+        form.setError(!scheduleDay ? "scheduleDay" : "scheduleTime", {
+          message: "Choose both a date and time.",
+        });
+        return false;
+      } else {
+        scheduledAt = publicationInstant(scheduleDay, scheduleTime, activity.scheduledAt);
+        if (!publicationIsFuture(scheduledAt)) {
+          form.setError("scheduleTime", { message: "Choose a future date and time." });
+          return false;
+        }
+      }
+    }
+    const patch: Partial<ActivitySettings> = isDirty ? { ...settingsValues } : {};
+    const dateChanged = publishedAt !== publicationDay(activity.publishedAt) || publishedTime !== publicationTime(activity.publishedAt);
+    let changedDate: string | undefined;
+    if (activityPublished((activity.settings ?? {}) as ActivitySettings) && values.published && dateChanged) {
+      if (!publishedAt || !publishedTime) {
+        form.setError(!publishedAt ? "publishedAt" : "publishedTime", { message: "Choose both a date and time." });
+        return false;
+      }
+      changedDate = publicationInstant(publishedAt, publishedTime, activity.publishedAt);
+      if (publicationIsFuture(changedDate)) {
+        form.setError("publishedTime", { message: "Publish date and time cannot be in the future." });
+        return false;
+      }
+    }
     if (contentDirty) {
       const config = latestConfig.current;
       const result = validate?.(config);
@@ -230,7 +286,7 @@ export function ActivityBuilder({
           patch.lessonDuration = previous;
         }
       }
-      const refusal = await updateActivitySettingsAction(course.id, moduleId, activity.id, patch);
+      const refusal = await updateActivitySettingsAction(course.id, moduleId, activity.id, patch, changedDate, scheduledAt);
       if (refusal) {
         toast.error("Couldn't save activity", { description: refusal.refused });
         return false;
@@ -249,7 +305,7 @@ export function ActivityBuilder({
     } finally {
       setSaving(false);
     }
-  }, [handleSubmit, isDirty, contentDirty, reset, course.id, moduleId, activity.id, activity.assetUrls, activity.settings, foreignFormat, router]);
+  }, [handleSubmit, isDirty, contentDirty, reset, course.id, moduleId, activity.id, activity.assetUrls, activity.settings, activity.publishedAt, activity.scheduledAt, form, foreignFormat, router]);
 
   const leave = useCallback(
     async (href: string) => {
@@ -321,7 +377,7 @@ export function ActivityBuilder({
     try {
       await deleteActivityAction(course.id, moduleId, activity.id);
       toast.success("Activity deleted");
-      router.push(base);
+      router.push(isFeed ? "/insider-feed" : base);
     } catch (err) {
       toast.error("Couldn't delete activity", { description: (err as Error).message });
       setDeleting(false);
@@ -351,6 +407,9 @@ export function ActivityBuilder({
     return (
       <ActivitySettingsPanel
         form={form}
+        artwork={{ courseId: course.id, moduleId, activityId: activity.id, assetId: ((activity.settings ?? {}) as ActivitySettings).thumbnailAssetId ?? null, url: activity.assetUrls?.[((activity.settings ?? {}) as ActivitySettings).thumbnailAssetId ?? ""] ?? null }}
+        previouslyPublished={activityPublished((activity.settings ?? {}) as ActivitySettings)}
+        hasPublicationDate={Boolean(activity.publishedAt)}
         courseTranscriptDownloads={courseTranscriptDownloads}
         courseCommentsEnabled={courseCommentsEnabled}
         onDelete={() => setConfirmingDelete(true)}
@@ -365,8 +424,8 @@ export function ActivityBuilder({
   return (
     <div className="flex h-dvh flex-col bg-surface">
       <header className="flex h-14 shrink-0 items-center gap-2 border-b border-line px-3 sm:gap-3 sm:px-4">
-        <Button asChild variant="ghost" size="icon-sm" aria-label="Back to course">
-          <Link href={base} onClick={guardLink}>
+        <Button asChild variant="ghost" size="icon-sm" aria-label={isFeed ? "Back to Insider Feed" : "Back to course"}>
+          <Link href={isFeed ? "/insider-feed" : base} onClick={guardLink}>
             <ArrowLeft />
           </Link>
         </Button>
@@ -388,7 +447,7 @@ export function ActivityBuilder({
         </DropdownMenu>}
         <Button asChild variant="secondary" size="sm">
           <Link
-            href={`${base}/${activity.id}/preview?panel=${panel ?? "none"}`}
+            href={`${base}/${activity.id}/preview?panel=${panel ?? "none"}${isFeed ? "&feed=1" : ""}`}
             onClick={guardLink}
           >
             <Eye />
@@ -405,7 +464,7 @@ export function ActivityBuilder({
           aria-label="Builder panels"
           className="flex w-20 shrink-0 flex-col items-center gap-1 border-r border-line py-2 max-lg:hidden"
         >
-          {PANELS.map((p) => (
+          {PANELS.filter((p) => !isFeed || p.id !== "curriculum").map((p) => (
             <RailButton
               key={p.id}
               icon={p.icon}
@@ -519,7 +578,7 @@ export function ActivityBuilder({
         aria-label="Builder panels"
         className="flex shrink-0 justify-around border-t border-line px-2 py-1 lg:hidden"
       >
-        {PANELS.map((p) => (
+        {PANELS.filter((p) => !isFeed || p.id !== "curriculum").map((p) => (
           <RailButton
             key={p.id}
             icon={p.icon}

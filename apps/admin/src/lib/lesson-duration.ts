@@ -1,4 +1,5 @@
 import Player from "@vimeo/player";
+import { containsVideoBlock } from "./activity-video";
 
 type LessonDuration = { kind: "video" | "written"; minutes: number | null; basis: "video" | "notes" };
 
@@ -23,7 +24,6 @@ export async function calculateLessonDuration(config: unknown, assets: Record<st
   if (!Array.isArray(config)) return { kind: "written", minutes: null, basis: "notes" };
   const first = config[firstContentIndex(config)];
   const video = first?.type === "video" ? first : null;
-  const containsVideo = (value: unknown): boolean => Array.isArray(value) ? value.some(containsVideo) : !!value && typeof value === "object" && ((value as { type?: string }).type === "video" || containsVideo((value as { children?: unknown }).children));
   if (!video) {
     const words: string[] = [];
     const visit = (value: unknown) => {
@@ -36,7 +36,7 @@ export async function calculateLessonDuration(config: unknown, assets: Record<st
     };
     visit(config);
     const text = words.join(" ").trim();
-    return { kind: containsVideo(config) ? "video" : "written", basis: "notes", minutes: text ? Math.max(1, Math.ceil(text.split(/\s+/).length / 200)) : null };
+    return { kind: containsVideoBlock(config) ? "video" : "written", basis: "notes", minutes: text ? Math.max(1, Math.ceil(text.split(/\s+/).length / 200)) : null };
   }
   let raw = typeof video.assetId === "string" ? assets[video.assetId] : video.url;
   if (typeof raw !== "string") return { kind: "video", minutes: null, basis: "video" };

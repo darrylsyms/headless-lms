@@ -35,6 +35,9 @@ function makeCourse(over: Partial<Course> = {}): Course {
     description: '',
     status: 'draft',
     category: '',
+    difficulty: 'all_levels',
+    publishedAt: null,
+    scheduledAt: null,
     thumbnailAssetId: null,
     settings: { transcriptDownloads: false },
     createdAt: AT,
@@ -45,8 +48,13 @@ function makeCourse(over: Partial<Course> = {}): Course {
 
 function makeRepo(): ContentRepository {
   return {
+    getInsiderFeed: vi.fn().mockResolvedValue(null),
+    ensureInsiderFeed: vi.fn(),
+    publishDueCourses: vi.fn(),
+    publishDueActivities: vi.fn(),
     listCourses: vi.fn(),
     findCourseById: vi.fn(),
+    lockCourseById: vi.fn(),
     createCourse: vi.fn(),
     updateCourse: vi.fn(),
     patchCourseSettings: vi.fn(),
@@ -55,6 +63,7 @@ function makeRepo(): ContentRepository {
     listActivitiesForCourse: vi.fn(),
     listActivityAssetsForCourse: vi.fn().mockResolvedValue([]),
     findActivity: vi.fn(),
+    lockActivity: vi.fn(),
     findModule: vi.fn(),
     reorderModules: vi.fn(),
     createModule: vi.fn(),
@@ -170,14 +179,16 @@ function fakeScheduler() {
   };
 }
 
-function build(repo = makeRepo(), assets: ContentAssetReader = libraryAssets) {
+function build(repo = makeRepo(), assets: ContentAssetReader = libraryAssets, assetFiles = files) {
+  vi.mocked(repo.lockCourseById).mockImplementation((...args) => repo.findCourseById(...args));
+  vi.mocked(repo.lockActivity).mockImplementation((...args) => repo.findActivity(...args));
   const { uow, append, appended } = fakeUow(repo);
   const scheduler = fakeScheduler();
   const svc = new ContentService({
     repo,
     uow,
     libraryAssets: assets,
-    files,
+    files: assetFiles,
     fileUrls,
     scheduler,
   });
@@ -191,6 +202,8 @@ function makeActivity(over: Partial<Activity> = {}): Activity {
     moduleId: 'm1',
     courseId: 'c1',
     seq: 0,
+    publishedAt: null,
+    scheduledAt: null,
     settings: {},
     createdAt: AT,
     updatedAt: AT,
@@ -204,6 +217,7 @@ function makeModule(over: Partial<Module> = {}): Module {
     id: 'm1',
     courseId: 'c1',
     title: 'Module 1',
+    description: null,
     seq: 0,
     createdAt: AT,
     updatedAt: AT,
@@ -212,6 +226,83 @@ function makeModule(over: Partial<Module> = {}): Module {
 }
 
 describe('ContentServiceImpl', () => {
+  it('schedules only draft courses for future dates and supports cancellation', async () => {
+    const repo = makeRepo();
+    const due = '2999-01-01T00:00:00.000Z';
+    vi.mocked(repo.findCourseById).mockResolvedValue(makeCourse());
+    vi.mocked(repo.updateCourse).mockResolvedValueOnce(makeCourse({ scheduledAt: new Date(due) })).mockResolvedValueOnce(makeCourse());
+    const { svc, scheduler } = build(repo);
+    await svc.updateCourse('c1', { scheduledAt: due }, ownerIn('org1'));
+    expect(repo.updateCourse).toHaveBeenCalledWith('org1', 'c1', { scheduledAt: due });
+    expect(scheduler.at).toHaveBeenCalledWith('content.publication.due', new Date(due), 'org1:course:c1', null);
+    await svc.updateCourse('c1', { scheduledAt: null }, ownerIn('org1'));
+    expect(scheduler.cancel).toHaveBeenCalledWith('content.publication.due', 'org1:course:c1');
+    await expect(svc.updateCourse('c1', { scheduledAt: '2000-01-01T00:00:00.000Z' }, ownerIn('org1'))).rejects.toThrow(InvalidInputError);
+    vi.mocked(repo.findCourseById).mockResolvedValue(makeCourse({ status: 'published' }));
+    await expect(svc.updateCourse('c1', { scheduledAt: due }, ownerIn('org1'))).rejects.toThrow(InvalidInputError);
+  });
+
+  it('clears a scheduled course release when published manually', async () => {
+    const repo = makeRepo();
+    const due = new Date('2999-01-01T00:00:00.000Z');
+    vi.mocked(repo.findCourseById).mockResolvedValue(makeCourse({ scheduledAt: due }));
+    vi.mocked(repo.updateCourse).mockResolvedValue(makeCourse({ status: 'published', scheduledAt: null, publishedAt: AT }));
+    const { svc, scheduler } = build(repo);
+    await svc.updateCourse('c1', { status: 'published' }, ownerIn('org1'));
+    expect(repo.updateCourse).toHaveBeenCalledWith('org1', 'c1', { status: 'published', scheduledAt: null, publishedAt: expect.any(String) });
+    expect(scheduler.cancel).toHaveBeenCalledWith('content.publication.due', 'org1:course:c1');
+  });
+
+  it('publishes due work and appends corresponding events together', async () => {
+    const repo = makeRepo();
+    const course = makeCourse({ status: 'published', publishedAt: AT });
+    const activity = makeActivity({ settings: { published: true }, publishedAt: AT });
+    vi.mocked(repo.publishDueCourses).mockResolvedValue([course]);
+    vi.mocked(repo.publishDueActivities).mockResolvedValue([activity]);
+    vi.mocked(repo.findCourseById).mockResolvedValue(course);
+    const { svc, appended } = build(repo);
+    await svc.publishDue(AT);
+    expect(appended.map((event) => event.type)).toEqual(['content.course.updated', 'content.course.activity.updated', 'content.course.activity.published']);
+  });
+
+  it('records the first course publication and preserves it on republishing', async () => {
+    const repo = makeRepo();
+    const old = new Date('2024-01-01T12:00:00.000Z');
+    vi.mocked(repo.findCourseById).mockResolvedValueOnce(makeCourse()).mockResolvedValueOnce(makeCourse({ publishedAt: old }));
+    vi.mocked(repo.updateCourse).mockResolvedValue(makeCourse({ status: 'published' }));
+    const { svc } = build(repo);
+    await svc.updateCourse('c1', { status: 'published' }, ownerIn('org1'));
+    expect(repo.updateCourse).toHaveBeenNthCalledWith(1, 'org1', 'c1', { status: 'published', publishedAt: expect.any(String) });
+    await svc.updateCourse('c1', { status: 'published' }, ownerIn('org1'));
+    expect(repo.updateCourse).toHaveBeenNthCalledWith(2, 'org1', 'c1', { status: 'published' });
+  });
+
+  it('accepts a revised publication date while published', async () => {
+    const repo = makeRepo();
+    const date = '2020-01-01T00:00:00.000Z';
+    vi.mocked(repo.findCourseById).mockResolvedValue(makeCourse({ status: 'published', publishedAt: AT }));
+    vi.mocked(repo.updateCourse).mockResolvedValue(makeCourse({ status: 'published', publishedAt: new Date(date) }));
+    const { svc } = build(repo);
+    await svc.updateCourse('c1', { publishedAt: date }, ownerIn('org1'));
+    expect(repo.updateCourse).toHaveBeenCalledWith('org1', 'c1', { publishedAt: date });
+  });
+
+  it('refuses future course publication dates', async () => {
+    const repo = makeRepo();
+    vi.mocked(repo.findCourseById).mockResolvedValue(makeCourse({ status: 'published', publishedAt: AT }));
+    const { svc } = build(repo);
+    await expect(svc.updateCourse('c1', { publishedAt: '2999-01-01T00:00:00.000Z' }, ownerIn('org1'))).rejects.toThrow('Publish date cannot be in the future');
+    expect(repo.updateCourse).not.toHaveBeenCalled();
+  });
+
+  it('refuses publication date changes on draft courses', async () => {
+    const repo = makeRepo();
+    vi.mocked(repo.findCourseById).mockResolvedValue(makeCourse());
+    const { svc } = build(repo);
+    await expect(svc.updateCourse('c1', { publishedAt: '2020-01-01T00:00:00.000Z' }, ownerIn('org1'))).rejects.toThrow(InvalidInputError);
+    expect(repo.updateCourse).not.toHaveBeenCalled();
+  });
+
   it('derives the slug from the title on create', async () => {
     const repo = makeRepo();
     const created = makeCourse({ title: 'My New Course', slug: 'my-new-course' });
@@ -243,6 +334,21 @@ describe('ContentServiceImpl', () => {
       thumbnailUrl: null,
     });
     expect(append).not.toHaveBeenCalled();
+  });
+
+  it('creates and reads the Insider Feed through the scoped content service', async () => {
+    const repo = makeRepo();
+    const feed = { courseId: 'feed-course', moduleId: 'feed-module' };
+    vi.mocked(repo.getInsiderFeed).mockResolvedValue(feed);
+    vi.mocked(repo.ensureInsiderFeed).mockResolvedValue(feed);
+    const { svc } = build(repo);
+    expect(await svc.getInsiderFeed(ownerIn('org1'))).toEqual(feed);
+    expect(await svc.ensureInsiderFeed(ownerIn('org1'))).toEqual(feed);
+    expect(repo.getInsiderFeed).toHaveBeenCalledWith('org1');
+    expect(repo.ensureInsiderFeed).toHaveBeenCalledWith('org1');
+    await expect(svc.deleteModule(feed.courseId, feed.moduleId, ownerIn('org1'))).rejects.toThrow('cannot be deleted');
+    vi.mocked(repo.findCourseById).mockResolvedValue(makeCourse({ id: feed.courseId }));
+    await expect(svc.deleteCourse(feed.courseId, ownerIn('org1'))).rejects.toThrow('cannot be deleted');
   });
 
   it('delegates a settings patch to the repository and returns its result', async () => {
@@ -325,6 +431,7 @@ describe('ContentServiceImpl', () => {
   it('appends course.updated with the updated snapshot', async () => {
     const repo = makeRepo();
     const updated = makeCourse({ title: 'Renamed' });
+    vi.mocked(repo.findCourseById).mockResolvedValue(makeCourse());
     (repo.updateCourse as ReturnType<typeof vi.fn>).mockResolvedValue(updated);
 
     const { svc, appended } = build(repo);
@@ -352,6 +459,7 @@ describe('ContentServiceImpl', () => {
     const repo = makeRepo();
     const course = makeCourse();
     (repo.findCourseById as ReturnType<typeof vi.fn>).mockResolvedValue(course);
+    (repo.lockCourseById as ReturnType<typeof vi.fn>).mockResolvedValue(course);
     (repo.deleteCourse as ReturnType<typeof vi.fn>).mockResolvedValue(true);
 
     const { svc, appended } = build(repo);
@@ -414,6 +522,19 @@ describe('modules', () => {
     ]);
   });
 
+  it('saves and emits a module description', async () => {
+    const repo = makeRepo();
+    const updated = makeModule({ description: 'A short introduction' });
+    vi.mocked(repo.findModule).mockResolvedValue(makeModule());
+    vi.mocked(repo.updateModule).mockResolvedValue([updated]);
+    const { svc, appended } = build(repo);
+
+    await svc.updateModule('c1', 'm1', 'Module 1', 'A short introduction', ownerIn('org1'));
+
+    expect(repo.updateModule).toHaveBeenCalledWith('org1', 'c1', 'm1', 'Module 1', 'A short introduction');
+    expect(appended[0]?.data).toEqual(updated);
+  });
+
   it('appends course.module.updated with the updated snapshot', async () => {
     const repo = makeRepo();
     const updated = makeModule({ title: 'Renamed' });
@@ -421,7 +542,7 @@ describe('modules', () => {
     vi.mocked(repo.updateModule).mockResolvedValue([updated]);
 
     const { svc, appended } = build(repo);
-    await svc.updateModule('c1', 'm1', 'Renamed', ownerIn('org1'));
+    await svc.updateModule('c1', 'm1', 'Renamed', undefined, ownerIn('org1'));
 
     expect(repo.updateModule).toHaveBeenCalledWith('org1', 'c1', 'm1', 'Renamed');
     expect(appended).toEqual([
@@ -439,7 +560,7 @@ describe('modules', () => {
     vi.mocked(repo.findModule).mockResolvedValue(makeModule({ courseId: 'other' }));
 
     const { svc, append } = build(repo);
-    await expect(svc.updateModule('c1', 'm1', 'Renamed', ownerIn('org1'))).rejects.toThrow(
+    await expect(svc.updateModule('c1', 'm1', 'Renamed', undefined, ownerIn('org1'))).rejects.toThrow(
       NotFoundError,
     );
     expect(repo.updateModule).not.toHaveBeenCalled();
@@ -498,6 +619,56 @@ describe('modules', () => {
 });
 
 describe('activities', () => {
+  it('preserves an activity publication date when republished', async () => {
+    const repo = makeRepo();
+    vi.mocked(repo.findActivity).mockResolvedValue(makeActivity({ settings: { published: false }, publishedAt: AT }));
+    vi.mocked(repo.saveActivity).mockResolvedValue({ modules: [], activity: makeActivity({ settings: { published: true }, publishedAt: AT }) });
+    const { svc } = build(repo);
+    await svc.saveActivity('c1', 'm1', { settings: { published: true } }, 'act1', ownerIn('org1'));
+    expect(repo.saveActivity).toHaveBeenCalledWith('org1', 'c1', 'm1', { settings: { published: true } }, 'act1');
+  });
+
+  it('allows future scheduling only for draft activities', async () => {
+    const repo = makeRepo();
+    const due = '2999-01-01T00:00:00.000Z';
+    vi.mocked(repo.findActivity).mockResolvedValue(makeActivity({ settings: { published: false } }));
+    vi.mocked(repo.saveActivity).mockResolvedValue({ modules: [], activity: makeActivity({ settings: { published: false }, scheduledAt: new Date(due) }) });
+    const { svc } = build(repo);
+    await svc.saveActivity('c1', 'm1', { settings: { published: false }, scheduledAt: due }, 'act1', ownerIn('org1'));
+    await expect(svc.saveActivity('c1', 'm1', { settings: { published: false }, scheduledAt: '2000-01-01T00:00:00.000Z' }, 'act1', ownerIn('org1'))).rejects.toThrow(InvalidInputError);
+    vi.mocked(repo.findActivity).mockResolvedValue(makeActivity({ settings: { published: true } }));
+    await expect(svc.saveActivity('c1', 'm1', { settings: { published: true }, scheduledAt: due }, 'act1', ownerIn('org1'))).rejects.toThrow(InvalidInputError);
+  });
+
+  it('clears a scheduled activity release when published manually', async () => {
+    const repo = makeRepo();
+    const due = new Date('2999-01-01T00:00:00.000Z');
+    vi.mocked(repo.findActivity).mockResolvedValue(makeActivity({ settings: { published: false }, scheduledAt: due }));
+    vi.mocked(repo.saveActivity).mockResolvedValue({ modules: [], activity: makeActivity({ settings: { published: true }, scheduledAt: null, publishedAt: AT }) });
+    const { svc, scheduler } = build(repo);
+    await svc.saveActivity('c1', 'm1', { settings: { published: true } }, 'act1', ownerIn('org1'));
+    expect(repo.saveActivity).toHaveBeenCalledWith('org1', 'c1', 'm1', { settings: { published: true }, scheduledAt: null, publishedAt: expect.any(String) }, 'act1');
+    expect(scheduler.cancel).toHaveBeenCalledWith('content.publication.due', 'org1:activity:act1');
+  });
+
+  it('refuses future activity publication dates', async () => {
+    const repo = makeRepo();
+    vi.mocked(repo.findActivity).mockResolvedValue(makeActivity({ settings: { published: true }, publishedAt: AT }));
+    const { svc } = build(repo);
+    await expect(svc.saveActivity('c1', 'm1', { settings: { published: true }, publishedAt: '2999-01-01T00:00:00.000Z' }, 'act1', ownerIn('org1'))).rejects.toThrow('Publish date cannot be in the future');
+    expect(repo.saveActivity).not.toHaveBeenCalled();
+  });
+
+  it('records the first activity publication and refuses dates on drafts', async () => {
+    const repo = makeRepo();
+    vi.mocked(repo.findActivity).mockResolvedValue(makeActivity({ settings: { published: false } }));
+    vi.mocked(repo.saveActivity).mockResolvedValue({ modules: [], activity: makeActivity({ settings: { published: true } }) });
+    const { svc } = build(repo);
+    await expect(svc.saveActivity('c1', 'm1', { settings: { published: false }, publishedAt: '2020-01-01T00:00:00.000Z' }, 'act1', ownerIn('org1'))).rejects.toThrow(InvalidInputError);
+    await svc.saveActivity('c1', 'm1', { settings: { published: true } }, 'act1', ownerIn('org1'));
+    expect(repo.saveActivity).toHaveBeenCalledWith('org1', 'c1', 'm1', { settings: { published: true }, publishedAt: expect.any(String) }, 'act1');
+  });
+
   it('appends course.activity.created with the new activity snapshot', async () => {
     const repo = makeRepo();
     const created = makeActivity({ id: 'act2', seq: 1 });
@@ -518,7 +689,7 @@ describe('activities', () => {
       'org1',
       'c1',
       'm1',
-      { settings: { title: 'A' } },
+      { settings: { title: 'A' }, publishedAt: expect.any(String) },
       undefined,
     );
     expect(result).toBe(modules);
@@ -530,6 +701,27 @@ describe('activities', () => {
         data: created,
       },
     ]);
+  });
+
+  it('only accepts attached, ready image assets as activity thumbnails', async () => {
+    const repo = makeRepo();
+    vi.mocked(repo.findActivity).mockResolvedValue(makeActivity());
+    vi.mocked(repo.saveActivity).mockResolvedValue({ modules: [makeModule()], activity: makeActivity() });
+    const input = { settings: { thumbnailAssetId: 'a1' }, assetIds: ['a1'] };
+
+    await expect(build(repo).svc.saveActivity('c1', 'm1', input, 'act1', ownerIn('org1')))
+      .rejects.toThrow('Activity thumbnail must be a ready image');
+    await expect(build(repo).svc.saveActivity('c1', 'm1', { ...input, assetIds: [] }, 'act1', ownerIn('org1')))
+      .rejects.toThrow('Activity thumbnail must be attached to the activity');
+
+    const imageFiles = {
+      ...files,
+      readyFiles: async (_orgId: string, ids: string[]) => Object.fromEntries(
+        ids.map((id) => [id, { filename: 'cover.png', contentType: 'image/png', size: 100 }]),
+      ),
+    };
+    await build(repo, libraryAssets, imageFiles).svc.saveActivity('c1', 'm1', input, 'act1', ownerIn('org1'));
+    expect(repo.saveActivity).toHaveBeenCalledWith('org1', 'c1', 'm1', expect.objectContaining(input), 'act1');
   });
 
   it('throws NotFoundError when creating an activity in a missing module', async () => {
@@ -701,6 +893,7 @@ describe('activities', () => {
   it('checks no file when a write clears the thumbnail or leaves it alone', async () => {
     const repo = makeRepo();
     const assets = library();
+    vi.mocked(repo.findCourseById).mockResolvedValue(makeCourse());
     vi.mocked(repo.updateCourse).mockResolvedValue(makeCourse());
     const { svc } = build(repo, assets);
 
@@ -821,6 +1014,7 @@ describe('logging', () => {
     (repo.createCourse as ReturnType<typeof vi.fn>).mockResolvedValue(course);
     (repo.updateCourse as ReturnType<typeof vi.fn>).mockResolvedValue(course);
     (repo.findCourseById as ReturnType<typeof vi.fn>).mockResolvedValue(course);
+    (repo.lockCourseById as ReturnType<typeof vi.fn>).mockResolvedValue(course);
     (repo.deleteCourse as ReturnType<typeof vi.fn>).mockResolvedValue(true);
     const { uow } = fakeUow(repo);
     const svc = new ContentService({

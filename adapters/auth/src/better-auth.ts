@@ -18,7 +18,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import * as authSchema from "@headless-lms/adapter-db/schema/better-auth";
 import { prefixId } from "@headless-lms/core/shared/id";
 import { ConflictError, NotFoundError } from "@headless-lms/core/shared/errors";
-import { jwt, magicLink, organization } from "better-auth/plugins";
+import { genericOAuth, jwt, magicLink, organization } from "better-auth/plugins";
 import { getOrgAdapter } from "better-auth/plugins/organization";
 import {
   type AccessTokenAuthorization,
@@ -165,13 +165,8 @@ export function buildAuthOptions(opts: CreateAuthOptions) {
       },
     },
     session: {
-      // Signed short-lived cookie cache: avoids a Postgres session lookup on
-      // every request. The BFF verifies the session per request (each API call
-      // + every SSR getSession), so without this each one is a DB round-trip.
-      // The cache holds for maxAge; sign-out / expiry still invalidate it.
       cookieCache: {
-        enabled: true,
-        maxAge: 5 * 60,
+        enabled: false,
       },
     },
     advanced: {
@@ -200,6 +195,7 @@ export function buildAuthOptions(opts: CreateAuthOptions) {
       provider: "pg",
       schema: authSchema,
     }),
+    ...(opts.externalIdentity ? { account: { accountLinking: { enabled: false, disableImplicitLinking: true } } } : {}),
     emailAndPassword: {
       enabled: true,
       // Detached so send time can't reveal which emails have accounts, and a failed notice can't fail the reset.
@@ -208,6 +204,14 @@ export function buildAuthOptions(opts: CreateAuthOptions) {
       revokeSessionsOnPasswordReset: true,
     },
     plugins: [
+      ...(opts.externalIdentity ? [genericOAuth({ config: [{
+        ...opts.externalIdentity,
+        requireIdTokenVerification: true,
+        pkce: true,
+        disableSignUp: true,
+        authentication: "basic",
+        disableProviderLogout: true,
+      }] })] : []),
       magicLink({
         disableSignUp: true,
         sendMagicLink,
@@ -608,14 +612,11 @@ export class BetterAuth
         updatedAt: res.user.updatedAt,
       },
       session: {
-        activeOrganizationId: res.session.activeOrganizationId ?? null,
+        activeOrganizationId: (res.session as typeof res.session & { activeOrganizationId?: string | null }).activeOrganizationId ?? null,
       },
     };
   }
 
-  /** Stamps the org onto the caller's session row. The 5-minute cookie cache
-   *  still holds the pre-stamp session, so callers refresh it client-side with
-   *  `getSession({ disableCookieCache: true })`. */
   async stampActiveOrganization(headers: AuthHeaders, orgId: string): Promise<boolean> {
     const session = await this.auth.api.getSession({ headers: fromNodeHeaders(headers) });
     const token = (session?.session as { token?: string } | undefined)?.token;

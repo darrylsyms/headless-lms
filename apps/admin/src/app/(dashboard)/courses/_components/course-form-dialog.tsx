@@ -9,32 +9,15 @@ import { FormDialog } from "@/components/forms/form-dialog";
 import { Field } from "@/components/forms/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { CategoryPicker } from "./category-picker";
 import { toast } from "sonner";
 
 import { createCourseAction, updateCourseAction } from "../actions";
 import type { Course } from "@/lib/api/types";
 
-const CATEGORIES = [
-  "Design",
-  "Engineering",
-  "Product",
-  "Marketing",
-  "Data",
-  "Leadership",
-  "Finance",
-  "Operations",
-] as const;
-
 const schema = z.object({
   title: z.string().trim().min(1, "Title is required").max(120, "Keep it under 120 characters"),
-  category: z.string().min(1, "Pick a category"),
+  category: z.string(),
   description: z.string().trim().max(600, "Keep it under 600 characters").optional(),
 });
 
@@ -46,7 +29,9 @@ export function CourseFormDialog({
   open,
   onOpenChange,
   course,
+  categories,
 }: {
+  categories: string[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Present = edit mode; absent = create mode. */
@@ -125,31 +110,19 @@ export function CourseFormDialog({
         <Field id="title" label="Title" required error={errors.title?.message}>
           <Input
             id="title"
-            placeholder="e.g. Foundations of Product Design"
+            placeholder="e.g. Guitar fundamentals"
             autoFocus
             aria-invalid={Boolean(errors.title)}
             {...register("title")}
           />
         </Field>
 
-        <Field id="category" label="Category" required error={errors.category?.message}>
-          <Select
-            value={category || undefined}
-            onValueChange={(v) =>
-              setValue("category", v, { shouldValidate: true, shouldDirty: true })
-            }
-          >
-            <SelectTrigger id="category" aria-invalid={Boolean(errors.category)}>
-              <SelectValue placeholder="Select a category" />
-            </SelectTrigger>
-            <SelectContent>
-              {CATEGORIES.map((c) => (
-                <SelectItem key={c} value={c}>
-                  {c}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <Field id="category" label="Category" error={errors.category?.message}>
+          <CategoryPicker
+            categories={categories}
+            value={category}
+            onChange={(v) => setValue("category", v, { shouldValidate: true, shouldDirty: true })}
+          />
         </Field>
 
         <Field

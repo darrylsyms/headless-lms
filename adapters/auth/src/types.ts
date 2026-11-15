@@ -1,5 +1,6 @@
 import { type GenericEndpointContext, type Session, type User } from "better-auth";
 import { type OrganizationOptions } from "better-auth/plugins";
+import type { GenericOAuthConfig } from "better-auth/plugins/generic-oauth";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import type { Logger } from "@headless-lms/core/types";
@@ -67,4 +68,13 @@ export interface CreateAuthOptions {
   cookieDomain?: string;
   /** Mark session cookies Secure (set behind HTTPS / in production). */
   secureCookies?: boolean;
+  externalIdentity?: {
+    providerId: string;
+    clientId: string;
+    clientSecret: string;
+    discoveryUrl: string;
+    redirectURI: string;
+    scopes: string[];
+    getUserInfo: NonNullable<GenericOAuthConfig["getUserInfo"]>;
+  };
 }

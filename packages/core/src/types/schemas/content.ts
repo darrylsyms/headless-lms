@@ -9,16 +9,26 @@ export type ContentType = z.infer<typeof contentTypeSchema>;
 export const courseStatusSchema = z.enum(['draft', 'published']);
 export type CourseStatus = z.infer<typeof courseStatusSchema>;
 
+export const courseDifficultySchema = z.enum([
+  'all_levels',
+  'beginner',
+  'intermediate',
+  'advanced',
+  'expert',
+]);
+export type CourseDifficulty = z.infer<typeof courseDifficultySchema>;
+
 export const courseSettingsSchema = z
   .object({
     transcriptDownloads: z.boolean(),
+    songLibrary: z.boolean().optional(),
     comments: commentSettingsSchema.optional(),
   })
   .strict();
 export type CourseSettings = z.infer<typeof courseSettingsSchema>;
 
 /** Defaults for keys a stored settings row doesn't carry (or no row at all). */
-export const courseSettingsDefaults: CourseSettings = { transcriptDownloads: false };
+export const courseSettingsDefaults: CourseSettings = { transcriptDownloads: false, songLibrary: false };
 
 export const activitySettingsSchema = z
   .object({
@@ -99,6 +109,9 @@ export const courseSchema = z
     description: z.string(),
     status: courseStatusSchema,
     category: z.string(),
+    difficulty: courseDifficultySchema,
+    publishedAt: z.coerce.date().nullable(),
+    scheduledAt: z.coerce.date().nullable(),
     thumbnailAssetId: idSchema.nullable(),
     settings: courseSettingsSchema,
     createdAt: z.coerce.date(),
@@ -119,6 +132,8 @@ export const activitySchema = z
     moduleId: idSchema,
     courseId: idSchema,
     seq: z.number().int().min(0),
+    publishedAt: z.coerce.date().nullable(),
+    scheduledAt: z.coerce.date().nullable(),
     settings: jsonValueSchema.nullable(),
     createdAt: z.coerce.date(),
     updatedAt: z.coerce.date(),
@@ -136,6 +151,7 @@ export const moduleSchema = z
     id: idSchema,
     courseId: idSchema,
     title: z.string(),
+    description: z.string().nullable(),
     seq: z.number().int().min(0),
     createdAt: z.coerce.date(),
     updatedAt: z.coerce.date(),
@@ -161,6 +177,8 @@ export type ActivityAssetInput = z.input<typeof activityAssetSchema>;
 export const saveActivityInputSchema = z
   .object({
     settings: jsonValueSchema.optional(),
+    publishedAt: z.iso.datetime().optional(),
+    scheduledAt: z.iso.datetime().nullable().optional(),
     assetIds: z.array(idSchema).optional(),
   })
   .strict();
@@ -183,6 +201,7 @@ export const createCourseInputSchema = z
     title: z.string(),
     description: z.string().optional(),
     category: z.string().optional(),
+    difficulty: courseDifficultySchema.optional(),
   })
   .strict();
 export type CreateCourseInput = z.infer<typeof createCourseInputSchema>;
@@ -192,6 +211,9 @@ export const updateCourseInputSchema = z
     title: z.string().optional(),
     description: z.string().optional(),
     category: z.string().optional(),
+    difficulty: courseDifficultySchema.optional(),
+    publishedAt: z.iso.datetime().optional(),
+    scheduledAt: z.iso.datetime().nullable().optional(),
     status: courseStatusSchema.optional(),
     thumbnailAssetId: idSchema.nullable().optional(),
   })

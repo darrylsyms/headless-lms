@@ -34,6 +34,7 @@ const ALL_NAV: NavItem[] = [
     key: "content",
     children: [
       { href: "/courses", label: "Courses", needs: ["courses:read"] },
+      { href: "/insider-feed", label: "Insider Feed", needs: ["courses:read"] },
       { href: "/downloads", label: "Downloads", needs: ["downloads:read"] },
       {
         href: "/communities",

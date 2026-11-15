@@ -61,7 +61,7 @@ export const account = pgTable("ba_account", {
   password: text("password"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
-});
+}, (table) => [uniqueIndex("ba_account_provider_account_uidx").on(table.providerId, table.accountId)]);
 
 export const verification = pgTable("ba_verification", {
   id: text("id").primaryKey(),

@@ -34,9 +34,8 @@ const people: MemberReportServiceParams['people'] = {
 
 const AT = new Date('2026-01-01T00:00:00.000Z');
 
-function fakeProgress(records: ProgressRecord[]): ProgressService {
+function fakeProgress(records: ProgressRecord[]): Pick<ProgressService, 'get' | 'listByTargets'> {
   return {
-    report: async () => records[0]!,
     get: async (_orgId, target) =>
       records.find((r) => r.targetType === target.targetType && r.targetId === target.targetId) ??
       null,
@@ -71,6 +70,9 @@ function course(id: string, status: 'draft' | 'published' = 'published'): Course
     description: '',
     status,
     category: '',
+    difficulty: 'all_levels',
+    publishedAt: null,
+    scheduledAt: null,
     thumbnailAssetId: null,
     settings: { transcriptDownloads: false },
     createdAt: AT,
@@ -85,6 +87,8 @@ function activity(id: string, seq: number, settings: unknown = {}): Activity {
     moduleId: 'm1',
     courseId: 'c1',
     seq,
+    publishedAt: null,
+    scheduledAt: null,
     settings: settings as Activity['settings'],
     createdAt: AT,
     updatedAt: AT,
@@ -119,6 +123,7 @@ function fakeContent(
   activities: Record<string, Activity[]> = {},
 ): ContentServicePort {
   return {
+    getInsiderFeed: async () => null,
     findCourse: async (id: string) => courses[id] ?? null,
     listCourseModules: async (courseId: string) => modules[courseId] ?? [],
     listCourseActivities: async (courseId: string) => activities[courseId] ?? [],
@@ -199,6 +204,8 @@ function fakeContentService(over: Partial<ContentServicePort> = {}): ContentServ
     throw new Error('not used');
   };
   return {
+    getInsiderFeed: async () => null,
+    ensureInsiderFeed: rejectMutation,
     listCourses: async () => ({ rows: [], total: 0, page: 1, pageSize: 20 }),
     findCourse: async () => null,
     createCourse: rejectMutation,
@@ -285,6 +292,29 @@ describe('MemberReportServiceImpl', () => {
     expect(rows.map((c) => c.id)).toEqual(['c1']);
   });
 
+  it('excludes the Insider Feed backing course from the course library', async () => {
+    const content = fakeContent({ c1: course('c1'), feed: course('feed') }, {});
+    content.getInsiderFeed = async () => ({ courseId: 'feed', moduleId: 'module' });
+    const svc = new MemberReportServiceImpl({
+      repo: fakeRepo(), content, progress: fakeProgress([]), ...deps,
+      access: grantedAccess([{ orgId: 'o1', contentId: 'c1' }, { orgId: 'o1', contentId: 'feed' }]),
+    });
+    expect((await svc.listCourses(stu)).map((item) => item.id)).toEqual(['c1']);
+    expect(await svc.insiderFeed(stu)).toEqual({ courseId: 'feed', moduleId: 'module' });
+  });
+
+  it('does not grant Insider Feed access from an unrelated course purchase', async () => {
+    const content = fakeContent({ c1: course('c1'), feed: course('feed') }, {});
+    content.getInsiderFeed = async () => ({ courseId: 'feed', moduleId: 'module' });
+    const svc = new MemberReportServiceImpl({
+      repo: fakeRepo(), content, progress: fakeProgress([]), ...deps,
+      access: grantedAccess([{ orgId: 'o1', contentId: 'c1' }]),
+    });
+    await expect(svc.getCourse('feed', stu)).rejects.toThrow(NotFoundError);
+    await expect(svc.insiderFeed(stu)).rejects.toThrow(NotFoundError);
+    expect((await svc.listCourses(stu)).map((item) => item.id)).toEqual(['c1']);
+  });
+
   it('throws NotFoundError for a course the student is not enrolled in', async () => {
     const svc = new MemberReportServiceImpl({
       repo: fakeRepo(),
@@ -312,7 +342,7 @@ describe('MemberReportServiceImpl', () => {
 
 // One module: a1 + a2 published, a3 a draft.
 const progressModules: Module[] = [
-  { orgId: 'o1', id: 'm1', courseId: 'c1', title: 'M1', seq: 0, createdAt: AT, updatedAt: AT },
+  { orgId: 'o1', id: 'm1', courseId: 'c1', title: 'M1', description: null, seq: 0, createdAt: AT, updatedAt: AT },
 ];
 const progressActivities: Activity[] = [
   activity('a1', 0),
@@ -550,6 +580,17 @@ describe('file URLs', () => {
       ['ou_sarah', fileUrls.publicImage('o1', 'ou_sarah', 'ast_photo')],
       ['ou_james', null],
     ]);
+  });
+
+  it('refuses course notification lists when the member lacks access', async () => {
+    const list = vi.fn(async () => ({ items: [], total: 0, unreadCount: 0 }));
+    const svc = new MemberReportServiceImpl({
+      repo: fakeRepo(), content: fakeContent({}, {}), progress: fakeProgress([]), ...deps,
+      notifications: { ...deps.notifications, list },
+    });
+    const member = { ...stu, userId: 'usr_1' };
+    await expect(svc.notifications({ courseId: 'crs_missing' }, { page: 1, pageSize: 1 }, member)).rejects.toBeInstanceOf(NotFoundError);
+    expect(list).not.toHaveBeenCalled();
   });
 
   it('names what each notification refers to and leaves out what the viewer cannot see', async () => {

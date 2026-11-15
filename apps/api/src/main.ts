@@ -18,10 +18,16 @@ import {
 } from "./config.js";
 
 const config = loadServerConfig();
+if (process.env.FRETWISE_STAGING_WORDPRESS_SSO === "1") {
+  config.container.trustedOrigins = [...new Set([...config.container.trustedOrigins, "http://localhost:3020"])];
+}
 const emailConfig = loadEmailConfig();
 const emailSinkDir = loadEmailSinkDir();
 const pushConfig = loadPushConfig();
 const container = await createContainer(config, {
+  ...(process.env.FRETWISE_STAGING_WORDPRESS_SSO === "1" ? {
+    externalIdentity: async (db) => (await import("../../../adapters/db/staging-wordpress.js")).stagingWordPressIdentity(db),
+  } : {}),
   pluginsDir: fileURLToPath(new URL("./plugins/", import.meta.url)),
   adapters: {
     email: emailSinkDir

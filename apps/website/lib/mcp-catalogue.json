@@ -759,6 +759,12 @@
           "type": "string",
           "required": false,
           "description": null
+        },
+        {
+          "name": "difficulty",
+          "type": "\"all_levels\" | \"beginner\" | \"intermediate\" | \"advanced\" | \"expert\"",
+          "required": false,
+          "description": null
         }
       ]
     },
@@ -796,6 +802,24 @@
           "description": null
         },
         {
+          "name": "difficulty",
+          "type": "\"all_levels\" | \"beginner\" | \"intermediate\" | \"advanced\" | \"expert\"",
+          "required": false,
+          "description": null
+        },
+        {
+          "name": "publishedAt",
+          "type": "date-time",
+          "required": false,
+          "description": null
+        },
+        {
+          "name": "scheduledAt",
+          "type": "date-time | null",
+          "required": false,
+          "description": null
+        },
+        {
           "name": "status",
           "type": "\"draft\" | \"published\"",
           "required": false,
@@ -826,6 +850,12 @@
         },
         {
           "name": "transcriptDownloads",
+          "type": "boolean",
+          "required": false,
+          "description": null
+        },
+        {
+          "name": "songLibrary",
           "type": "boolean",
           "required": false,
           "description": null
@@ -886,6 +916,12 @@
           "name": "moduleId",
           "type": "string",
           "required": true,
+          "description": null
+        },
+        {
+          "name": "description",
+          "type": "string | null",
+          "required": false,
           "description": null
         }
       ]

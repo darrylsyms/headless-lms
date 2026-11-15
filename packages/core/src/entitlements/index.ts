@@ -1,5 +1,6 @@
 // entitlements context — public surface. Re-export only what other contexts may use.
 export { EntitlementsServiceImpl } from './service.js';
+export { PurchaseSyncService } from './purchase-sync.js';
 export { entitlementEvents } from './events.js';
 export { opensSpace, seesSpace } from './rules.js';
 export { GRANTS_EXPIRE_JOB, entitlementsJobs, entitlementsRecurringJobs } from './jobs.js';

@@ -127,6 +127,9 @@ export interface ActivityContent {
  * the editor reads/writes these fields, defaulting anything missing.
  */
 export interface ActivitySettings {
+  category?: string;
+  difficulty?: "all_levels" | "beginner" | "intermediate" | "advanced" | "expert";
+  thumbnailAssetId?: string | null;
   lessonDuration?: { kind: "video" | "written"; minutes: number | null; basis?: "video" | "notes" };
   title?: string;
   body?: string;

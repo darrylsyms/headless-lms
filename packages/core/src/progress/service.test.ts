@@ -14,7 +14,29 @@ const SYSTEM: Actor = actorWith({ id: 'system', orgId: 'org-1', owner: true });
 
 function fakeRepo() {
   const records: ProgressRecord[] = [];
+  const saved = new Set<string>();
+  const views = new Map<string, Date>();
   const repo: ProgressRepository = {
+    async recordView(org, user, id) { views.set(`${org}:${user}:${id}`, new Date()); },
+    async listRecentViews(org, user) {
+      const prefix = `${org}:${user}:`;
+      return [...views.entries()].filter(([key]) => key.startsWith(prefix)).map(([key, viewedAt]) => ({ activityId: key.slice(prefix.length), viewedAt }));
+    },
+    async listSavedIds(org, user) {
+      const prefix = `${org}:${user}:`;
+      return [...saved].filter((key) => key.startsWith(prefix)).map((key) => key.slice(prefix.length));
+    },
+    async savedAmong(org, user, ids) {
+      return ids.filter((id) => saved.has(`${org}:${user}:${id}`));
+    },
+    async setSaved(org, user, id, value) {
+      const key = `${org}:${user}:${id}`;
+      if (value) {
+        saved.add(key);
+      } else {
+        saved.delete(key);
+      }
+    },
     async insert(_orgId, record) {
       records.push(record);
       return record;
@@ -66,7 +88,7 @@ function fakeUow(repo: ProgressRepository) {
 const AT = new Date('2026-01-01T00:00:00Z');
 
 function module(id: string, seq: number, title: string): Module {
-  return { orgId: 'org-1', id, courseId: 'c1', title, seq, createdAt: AT, updatedAt: AT };
+  return { orgId: 'org-1', id, courseId: 'c1', title, description: null, seq, createdAt: AT, updatedAt: AT };
 }
 
 function activity(id: string, moduleId: string, seq: number, settings: unknown = {}): Activity {
@@ -76,6 +98,8 @@ function activity(id: string, moduleId: string, seq: number, settings: unknown =
     moduleId,
     courseId: 'c1',
     seq,
+    publishedAt: null,
+    scheduledAt: null,
     settings: settings as Activity['settings'],
     createdAt: AT,
     updatedAt: AT,
@@ -103,6 +127,7 @@ function fakeContent(
   courseStatus: 'published' | 'draft' = 'published',
 ): CourseManagementService {
   return {
+    getInsiderFeed: vi.fn(async () => null),
     findCourse: vi.fn(async (id: string, actor: Actor) => {
       expect(actor).toBe(SYSTEM);
       return id === 'c1' ? { id, status: courseStatus } : null;
@@ -209,13 +234,13 @@ describe('ProgressService.report', () => {
     expect(completed[0]?.data.targetId).toBe('a1');
   });
 
-  it('completed claim with an unmet rule records nothing', async () => {
+  it('manual completion works even when a legacy automatic rule is stored', async () => {
     const { svc, appended } = makeService(
       structure({ a1Settings: { completion: { rule: 'watch-percent', percent: 80 } } }),
     );
     const record = await svc.report(input('a1', [{ completed: true }]), learner);
-    expect(record.completedAt).toBeNull();
-    expect(appended.filter((e) => e.type === 'progress.record.completed')).toHaveLength(0);
+    expect(record.completedAt).toEqual(new Date('2026-07-23T10:00:00.000Z'));
+    expect(appended.filter((e) => e.type === 'progress.record.completed')).toHaveLength(1);
   });
 
   it('re-claiming a completed activity changes nothing and emits nothing', async () => {
@@ -340,4 +365,89 @@ describe('ProgressService reads', () => {
     const list = await svc.listByTargets('org-1', 's1', ['a1', 'a2']);
     expect(list).toHaveLength(1);
   });
+});
+
+describe('saved lessons', () => {
+  it('keeps saved lessons scoped to the learner and requires access', async () => {
+    const { svc } = makeService(structure());
+    await svc.setSaved('c1', 'a1', true, learner);
+    expect(await svc.listSaved('c1', learner)).toEqual(['a1']);
+    expect(await svc.listSaved('c1', actorWith({ id: 'other', orgId: 'org-1' }))).toEqual([]);
+    await expect(svc.setSaved('c1', 'missing', true, learner)).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
+    await svc.setSaved('c1', 'a1', false, learner);
+    expect(await svc.listSaved('c1', learner)).toEqual([]);
+    const denied = makeService(structure(), { hasAccess: false }).svc;
+    await expect(denied.listSaved('c1', learner)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(denied.setSaved('c1', 'a1', true, learner)).rejects.toBeInstanceOf(NotFoundError);
+  });
+  it('does not expose draft lessons', async () => {
+    const { svc } = makeService(structure({ a1Settings: { published: false } }));
+    await expect(svc.setSaved('c1', 'a1', true, learner)).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+
+describe('recent activity views', () => {
+  it('records only accessible published activities, independently of progress', async () => {
+    const { svc, records } = makeService(structure());
+    await svc.recordView('a1', learner);
+    expect(records).toEqual([]);
+    await svc.recordView('a1', learner);
+    expect(await svc.listRecentViews(learner)).toHaveLength(1);
+    expect(await svc.listRecentViews(learner)).toMatchObject([{ activityId: 'a1', courseId: 'c1', accessible: true }]);
+    expect(await svc.listRecentViews(actorWith({ id: 'other', orgId: 'org-1' }))).toEqual([]);
+    await expect(svc.recordView('missing', learner)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(makeService(structure(), { hasAccess: false }).svc.recordView('a1', learner)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(makeService(structure({ a1Settings: { published: false } })).svc.recordView('a1', learner)).rejects.toBeInstanceOf(NotFoundError);
+  });
+  it('keeps a view visible after access is lost', async () => {
+    const { repo } = fakeRepo();
+    const content = fakeContent(structure().modules, structure().activities);
+    let accessible = true;
+    const svc = new ProgressServiceImpl({ repo, content, access: { hasAccess: async () => accessible }, system: { systemActor: () => SYSTEM }, uow: fakeUow(repo).uow });
+    await svc.recordView('a1', learner);
+    accessible = false;
+    expect(await svc.listRecentViews(learner)).toMatchObject([{ activityId: 'a1', accessible: false }]);
+  });
+});
+
+
+describe('all saved activities', () => {
+  it('lists a learner’s items across courses, keeps lost access locked, and removes only their own item', async () => {
+    const { repo } = fakeRepo();
+    const first = activity('a1', 'm1', 0, { title: 'First lesson' });
+    const second = { ...activity('a2', 'm2', 0, { title: 'Second lesson' }), courseId: 'c2' };
+    const content = {
+      getInsiderFeed: vi.fn(async () => ({ courseId: 'c2', moduleId: 'm2' })),
+      getActivity: vi.fn(async (id: string) => [first, second].find((item) => item.id === id) ?? null),
+      findCourse: vi.fn(async (id: string) => ({ id, status: 'published', thumbnailUrl: null, settings: { songLibrary: id === 'c1' } })),
+      listCourseActivities: vi.fn(async (id: string) => [first, second].filter((item) => item.courseId === id)),
+      listCourseModules: vi.fn(async () => []),
+    } as unknown as CourseManagementService;
+    let openSecond = true;
+    const svc = new ProgressServiceImpl({ repo, content, access: { hasAccess: async (_org, _user, course) => course === 'c1' || openSecond }, system: { systemActor: () => SYSTEM }, uow: fakeUow(repo).uow });
+    const other = actorWith({ id: 'other', orgId: 'org-1' });
+    await svc.setSaved('c1', 'a1', true, learner);
+    await svc.setSaved('c2', 'a2', true, learner);
+    await svc.setSaved('c2', 'a2', true, other);
+    openSecond = false;
+    expect(await svc.listAllSaved(learner)).toMatchObject([{ activityId: 'a1', kind: 'song', accessible: true }, { activityId: 'a2', kind: 'insider', accessible: false }]);
+    expect(await svc.listAllSaved(other)).toMatchObject([{ activityId: 'a2', accessible: false }]);
+    await svc.removeSaved('a2', learner);
+    expect(await svc.listAllSaved(learner)).toMatchObject([{ activityId: 'a1' }]);
+    expect(await svc.listAllSaved(other)).toHaveLength(1);
+  });
+});
+
+
+it('does not complete on an activity view when automatic settings are stored', async () => {
+  const { svc, records } = makeService(structure({ a1Settings: { completion: 'view' } }));
+  await svc.recordView('a1', learner);
+  expect(records).toEqual([]);
+  const record = await svc.report(input('a1', []), learner);
+  expect(record.completedAt).toBeNull();
+  const completed = await svc.report(input('a1', [{ completed: true }]), learner);
+  expect(completed.completedAt).not.toBeNull();
 });

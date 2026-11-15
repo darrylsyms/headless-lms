@@ -2382,6 +2382,533 @@ export type GetDefaultNotificationCategoriesResponses = {
 export type GetDefaultNotificationCategoriesResponse =
   GetDefaultNotificationCategoriesResponses[keyof GetDefaultNotificationCategoriesResponses];
 
+export type GetInsiderFeedData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/api/insider-feed";
+};
+
+export type GetInsiderFeedErrors = {
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type GetInsiderFeedError = GetInsiderFeedErrors[keyof GetInsiderFeedErrors];
+
+export type GetInsiderFeedResponses = {
+  /**
+   * Default Response
+   */
+  200: {
+    courseId: string;
+    moduleId: string;
+  } | null;
+};
+
+export type GetInsiderFeedResponse = GetInsiderFeedResponses[keyof GetInsiderFeedResponses];
+
+export type EnsureInsiderFeedData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/api/insider-feed";
+};
+
+export type EnsureInsiderFeedErrors = {
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type EnsureInsiderFeedError = EnsureInsiderFeedErrors[keyof EnsureInsiderFeedErrors];
+
+export type EnsureInsiderFeedResponses = {
+  /**
+   * Default Response
+   */
+  200: {
+    courseId: string;
+    moduleId: string;
+  };
+};
+
+export type EnsureInsiderFeedResponse =
+  EnsureInsiderFeedResponses[keyof EnsureInsiderFeedResponses];
+
+export type DeleteInsiderCategoryData = {
+  body: {
+    name: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/api/insider-categories";
+};
+
+export type DeleteInsiderCategoryErrors = {
+  /**
+   * Default Response
+   */
+  400: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    issues?: Array<{
+      /**
+       * Where in the request, such as `body.topics[1].name`
+       */
+      path: string;
+      message: string;
+    }>;
+  };
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  404: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type DeleteInsiderCategoryError =
+  DeleteInsiderCategoryErrors[keyof DeleteInsiderCategoryErrors];
+
+export type DeleteInsiderCategoryResponses = {
+  /**
+   * Default Response
+   */
+  200: Array<string>;
+};
+
+export type DeleteInsiderCategoryResponse =
+  DeleteInsiderCategoryResponses[keyof DeleteInsiderCategoryResponses];
+
+export type ListInsiderCategoriesData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/api/insider-categories";
+};
+
+export type ListInsiderCategoriesErrors = {
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type ListInsiderCategoriesError =
+  ListInsiderCategoriesErrors[keyof ListInsiderCategoriesErrors];
+
+export type ListInsiderCategoriesResponses = {
+  /**
+   * Default Response
+   */
+  200: Array<string>;
+};
+
+export type ListInsiderCategoriesResponse =
+  ListInsiderCategoriesResponses[keyof ListInsiderCategoriesResponses];
+
+export type ChangeInsiderCategoryData = {
+  body: {
+    name: string;
+    previous?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/api/insider-categories";
+};
+
+export type ChangeInsiderCategoryErrors = {
+  /**
+   * Default Response
+   */
+  400: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    issues?: Array<{
+      /**
+       * Where in the request, such as `body.topics[1].name`
+       */
+      path: string;
+      message: string;
+    }>;
+  };
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  404: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  409: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  422: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    issues?: Array<{
+      /**
+       * Where in the request, such as `body.topics[1].name`
+       */
+      path: string;
+      message: string;
+    }>;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type ChangeInsiderCategoryError =
+  ChangeInsiderCategoryErrors[keyof ChangeInsiderCategoryErrors];
+
+export type ChangeInsiderCategoryResponses = {
+  /**
+   * Default Response
+   */
+  200: Array<string>;
+};
+
+export type ChangeInsiderCategoryResponse =
+  ChangeInsiderCategoryResponses[keyof ChangeInsiderCategoryResponses];
+
+export type DeleteCourseCategoryData = {
+  body: {
+    name: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/api/course-categories";
+};
+
+export type DeleteCourseCategoryErrors = {
+  /**
+   * Default Response
+   */
+  400: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    issues?: Array<{
+      /**
+       * Where in the request, such as `body.topics[1].name`
+       */
+      path: string;
+      message: string;
+    }>;
+  };
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  404: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type DeleteCourseCategoryError =
+  DeleteCourseCategoryErrors[keyof DeleteCourseCategoryErrors];
+
+export type DeleteCourseCategoryResponses = {
+  /**
+   * Default Response
+   */
+  200: Array<string>;
+};
+
+export type DeleteCourseCategoryResponse =
+  DeleteCourseCategoryResponses[keyof DeleteCourseCategoryResponses];
+
+export type ListCourseCategoriesData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/api/course-categories";
+};
+
+export type ListCourseCategoriesErrors = {
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type ListCourseCategoriesError =
+  ListCourseCategoriesErrors[keyof ListCourseCategoriesErrors];
+
+export type ListCourseCategoriesResponses = {
+  /**
+   * Default Response
+   */
+  200: Array<string>;
+};
+
+export type ListCourseCategoriesResponse =
+  ListCourseCategoriesResponses[keyof ListCourseCategoriesResponses];
+
+export type ChangeCourseCategoryData = {
+  body: {
+    name: string;
+    previous?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/api/course-categories";
+};
+
+export type ChangeCourseCategoryErrors = {
+  /**
+   * Default Response
+   */
+  400: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    issues?: Array<{
+      /**
+       * Where in the request, such as `body.topics[1].name`
+       */
+      path: string;
+      message: string;
+    }>;
+  };
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  404: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  409: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  422: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    issues?: Array<{
+      /**
+       * Where in the request, such as `body.topics[1].name`
+       */
+      path: string;
+      message: string;
+    }>;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type ChangeCourseCategoryError =
+  ChangeCourseCategoryErrors[keyof ChangeCourseCategoryErrors];
+
+export type ChangeCourseCategoryResponses = {
+  /**
+   * Default Response
+   */
+  200: Array<string>;
+};
+
+export type ChangeCourseCategoryResponse =
+  ChangeCourseCategoryResponses[keyof ChangeCourseCategoryResponses];
+
 export type ListCoursesData = {
   body?: never;
   path?: never;
@@ -2454,9 +2981,13 @@ export type ListCoursesResponses = {
       description: string;
       status: "draft" | "published";
       category: string;
+      difficulty: "all_levels" | "beginner" | "intermediate" | "advanced" | "expert";
+      publishedAt: string | null;
+      scheduledAt: string | null;
       thumbnailAssetId: string | null;
       settings: {
         transcriptDownloads: boolean;
+        songLibrary?: boolean;
         comments?: {
           enabled: boolean;
           threaded: boolean;
@@ -2481,6 +3012,7 @@ export type CreateCourseData = {
     title: string;
     description?: string;
     category?: string;
+    difficulty?: "all_levels" | "beginner" | "intermediate" | "advanced" | "expert";
   };
   path?: never;
   query?: never;
@@ -2552,9 +3084,13 @@ export type CreateCourseResponses = {
     description: string;
     status: "draft" | "published";
     category: string;
+    difficulty: "all_levels" | "beginner" | "intermediate" | "advanced" | "expert";
+    publishedAt: string | null;
+    scheduledAt: string | null;
     thumbnailAssetId: string | null;
     settings: {
       transcriptDownloads: boolean;
+      songLibrary?: boolean;
       comments?: {
         enabled: boolean;
         threaded: boolean;
@@ -2712,9 +3248,13 @@ export type GetCourseResponses = {
     description: string;
     status: "draft" | "published";
     category: string;
+    difficulty: "all_levels" | "beginner" | "intermediate" | "advanced" | "expert";
+    publishedAt: string | null;
+    scheduledAt: string | null;
     thumbnailAssetId: string | null;
     settings: {
       transcriptDownloads: boolean;
+      songLibrary?: boolean;
       comments?: {
         enabled: boolean;
         threaded: boolean;
@@ -2735,6 +3275,9 @@ export type UpdateCourseData = {
     title?: string;
     description?: string;
     category?: string;
+    difficulty?: "all_levels" | "beginner" | "intermediate" | "advanced" | "expert";
+    publishedAt?: string;
+    scheduledAt?: string | null;
     status?: "draft" | "published";
     thumbnailAssetId?: string | null;
   };
@@ -2818,9 +3361,13 @@ export type UpdateCourseResponses = {
     description: string;
     status: "draft" | "published";
     category: string;
+    difficulty: "all_levels" | "beginner" | "intermediate" | "advanced" | "expert";
+    publishedAt: string | null;
+    scheduledAt: string | null;
     thumbnailAssetId: string | null;
     settings: {
       transcriptDownloads: boolean;
+      songLibrary?: boolean;
       comments?: {
         enabled: boolean;
         threaded: boolean;
@@ -2839,6 +3386,7 @@ export type UpdateCourseResponse = UpdateCourseResponses[keyof UpdateCourseRespo
 export type UpdateCourseSettingsData = {
   body: {
     transcriptDownloads?: boolean;
+    songLibrary?: boolean;
     comments?: {
       enabled: boolean;
       threaded: boolean;
@@ -2912,6 +3460,7 @@ export type UpdateCourseSettingsResponses = {
    */
   200: {
     transcriptDownloads: boolean;
+    songLibrary?: boolean;
     comments?: {
       enabled: boolean;
       threaded: boolean;
@@ -18317,6 +18866,64 @@ export type BlockMemberResponses = {
   204: unknown;
 };
 
+export type GetMemberInsiderFeedData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/api/member/insider-feed";
+};
+
+export type GetMemberInsiderFeedErrors = {
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  404: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type GetMemberInsiderFeedError =
+  GetMemberInsiderFeedErrors[keyof GetMemberInsiderFeedErrors];
+
+export type GetMemberInsiderFeedResponses = {
+  /**
+   * Default Response
+   */
+  200: {
+    courseId: string;
+    moduleId: string;
+  } | null;
+};
+
+export type GetMemberInsiderFeedResponse =
+  GetMemberInsiderFeedResponses[keyof GetMemberInsiderFeedResponses];
+
 export type ListMemberCoursesData = {
   body?: never;
   path?: never;
@@ -18366,9 +18973,13 @@ export type ListMemberCoursesResponses = {
     description: string;
     status: "draft" | "published";
     category: string;
+    difficulty: "all_levels" | "beginner" | "intermediate" | "advanced" | "expert";
+    publishedAt: string | null;
+    scheduledAt: string | null;
     thumbnailAssetId: string | null;
     settings: {
       transcriptDownloads: boolean;
+      songLibrary?: boolean;
       comments?: {
         enabled: boolean;
         threaded: boolean;
@@ -18459,9 +19070,13 @@ export type GetMemberCourseResponses = {
     description: string;
     status: "draft" | "published";
     category: string;
+    difficulty: "all_levels" | "beginner" | "intermediate" | "advanced" | "expert";
+    publishedAt: string | null;
+    scheduledAt: string | null;
     thumbnailAssetId: string | null;
     settings: {
       transcriptDownloads: boolean;
+      songLibrary?: boolean;
       comments?: {
         enabled: boolean;
         threaded: boolean;
@@ -18547,6 +19162,7 @@ export type ListMemberModulesResponses = {
     id: string;
     courseId: string;
     title: string;
+    description: string | null;
     seq: number;
     createdAt: string;
     updatedAt: string;
@@ -18628,6 +19244,8 @@ export type ListMemberActivitiesResponses = {
     moduleId: string;
     courseId: string;
     seq: number;
+    publishedAt: string | null;
+    scheduledAt: string | null;
     settings: JsonValue;
     createdAt: string;
     updatedAt: string;
@@ -18639,6 +19257,243 @@ export type ListMemberActivitiesResponses = {
 
 export type ListMemberActivitiesResponse =
   ListMemberActivitiesResponses[keyof ListMemberActivitiesResponses];
+
+export type ListAllSavedActivitiesData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/api/member/saved-activities";
+};
+
+export type ListAllSavedActivitiesErrors = {
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type ListAllSavedActivitiesError =
+  ListAllSavedActivitiesErrors[keyof ListAllSavedActivitiesErrors];
+
+export type ListAllSavedActivitiesResponses = {
+  /**
+   * Default Response
+   */
+  200: Array<{
+    activityId: string;
+    courseId: string;
+    title: string;
+    kind: "lesson" | "song" | "insider";
+    thumbnailUrl: string | null;
+    accessible: boolean;
+  }>;
+};
+
+export type ListAllSavedActivitiesResponse =
+  ListAllSavedActivitiesResponses[keyof ListAllSavedActivitiesResponses];
+
+export type RemoveSavedActivityData = {
+  body?: never;
+  path: {
+    activityId: string;
+  };
+  query?: never;
+  url: "/api/member/saved-activities/{activityId}";
+};
+
+export type RemoveSavedActivityErrors = {
+  /**
+   * Default Response
+   */
+  400: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    issues?: Array<{
+      /**
+       * Where in the request, such as `body.topics[1].name`
+       */
+      path: string;
+      message: string;
+    }>;
+  };
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type RemoveSavedActivityError = RemoveSavedActivityErrors[keyof RemoveSavedActivityErrors];
+
+export type RemoveSavedActivityResponses = {
+  /**
+   * Default Response
+   */
+  204: unknown;
+};
+
+export type ListRecentActivitiesData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/api/member/recent-activities";
+};
+
+export type ListRecentActivitiesErrors = {
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type ListRecentActivitiesError =
+  ListRecentActivitiesErrors[keyof ListRecentActivitiesErrors];
+
+export type ListRecentActivitiesResponses = {
+  /**
+   * Default Response
+   */
+  200: Array<{
+    activityId: string;
+    courseId: string;
+    title: string;
+    kind: "lesson" | "song" | "insider";
+    thumbnailUrl: string | null;
+    viewedAt: string;
+    accessible: boolean;
+  }>;
+};
+
+export type ListRecentActivitiesResponse =
+  ListRecentActivitiesResponses[keyof ListRecentActivitiesResponses];
+
+export type RecordActivityViewData = {
+  body: {
+    activity: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/api/member/recent-activities";
+};
+
+export type RecordActivityViewErrors = {
+  /**
+   * Default Response
+   */
+  400: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    issues?: Array<{
+      /**
+       * Where in the request, such as `body.topics[1].name`
+       */
+      path: string;
+      message: string;
+    }>;
+  };
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  404: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type RecordActivityViewError = RecordActivityViewErrors[keyof RecordActivityViewErrors];
+
+export type RecordActivityViewResponses = {
+  /**
+   * Default Response
+   */
+  204: unknown;
+};
 
 export type ReportProgressData = {
   body: {
@@ -18797,6 +19652,150 @@ export type GetMemberCourseProgressResponses = {
 
 export type GetMemberCourseProgressResponse =
   GetMemberCourseProgressResponses[keyof GetMemberCourseProgressResponses];
+
+export type ListSavedActivitiesData = {
+  body?: never;
+  path: {
+    courseId: string;
+  };
+  query?: never;
+  url: "/api/member/courses/{courseId}/saved-activities";
+};
+
+export type ListSavedActivitiesErrors = {
+  /**
+   * Default Response
+   */
+  400: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    issues?: Array<{
+      /**
+       * Where in the request, such as `body.topics[1].name`
+       */
+      path: string;
+      message: string;
+    }>;
+  };
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  404: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type ListSavedActivitiesError = ListSavedActivitiesErrors[keyof ListSavedActivitiesErrors];
+
+export type ListSavedActivitiesResponses = {
+  /**
+   * Default Response
+   */
+  200: {
+    saved: Array<string>;
+  };
+};
+
+export type ListSavedActivitiesResponse =
+  ListSavedActivitiesResponses[keyof ListSavedActivitiesResponses];
+
+export type SetSavedActivityData = {
+  body: {
+    activity: string;
+    saved: boolean;
+  };
+  path: {
+    courseId: string;
+  };
+  query?: never;
+  url: "/api/member/courses/{courseId}/saved-activities";
+};
+
+export type SetSavedActivityErrors = {
+  /**
+   * Default Response
+   */
+  400: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    issues?: Array<{
+      /**
+       * Where in the request, such as `body.topics[1].name`
+       */
+      path: string;
+      message: string;
+    }>;
+  };
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  404: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type SetSavedActivityError = SetSavedActivityErrors[keyof SetSavedActivityErrors];
+
+export type SetSavedActivityResponses = {
+  /**
+   * Default Response
+   */
+  204: unknown;
+};
 
 export type ListActivityCommentsData = {
   body?: never;
@@ -22968,6 +23967,14 @@ export type ListMemberNotificationsData = {
      * `true` for unread notifications only
      */
     unread?: string;
+    /**
+     * Only visible lesson comments in this accessible course
+     */
+    courseId?: string;
+    /**
+     * Only this notification
+     */
+    notificationId?: string;
   };
   url: "/api/member/notifications";
 };
@@ -23000,6 +24007,14 @@ export type ListMemberNotificationsErrors = {
    * Default Response
    */
   403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  404: {
     error: string;
     message?: string;
     requestId?: string;
@@ -24811,6 +25826,7 @@ export type ListModulesResponses = {
     id: string;
     courseId: string;
     title: string;
+    description: string | null;
     seq: number;
     createdAt: string;
     updatedAt: string;
@@ -24883,6 +25899,7 @@ export type CreateModuleResponses = {
     id: string;
     courseId: string;
     title: string;
+    description: string | null;
     seq: number;
     createdAt: string;
     updatedAt: string;
@@ -24954,6 +25971,8 @@ export type ListActivitiesResponses = {
     moduleId: string;
     courseId: string;
     seq: number;
+    publishedAt: string | null;
+    scheduledAt: string | null;
     settings: JsonValue;
     createdAt: string;
     updatedAt: string;
@@ -25103,6 +26122,7 @@ export type ReorderModulesResponses = {
     id: string;
     courseId: string;
     title: string;
+    description: string | null;
     seq: number;
     createdAt: string;
     updatedAt: string;
@@ -25182,6 +26202,7 @@ export type DeleteModuleResponses = {
     id: string;
     courseId: string;
     title: string;
+    description: string | null;
     seq: number;
     createdAt: string;
     updatedAt: string;
@@ -25193,6 +26214,7 @@ export type DeleteModuleResponse = DeleteModuleResponses[keyof DeleteModuleRespo
 export type UpdateModuleData = {
   body: {
     title: string;
+    description?: string | null;
   };
   path: {
     courseId: string;
@@ -25263,6 +26285,7 @@ export type UpdateModuleResponses = {
     id: string;
     courseId: string;
     title: string;
+    description: string | null;
     seq: number;
     createdAt: string;
     updatedAt: string;
@@ -25355,6 +26378,7 @@ export type ReorderActivitiesResponses = {
     id: string;
     courseId: string;
     title: string;
+    description: string | null;
     seq: number;
     createdAt: string;
     updatedAt: string;
@@ -25447,6 +26471,7 @@ export type MoveActivityResponses = {
     id: string;
     courseId: string;
     title: string;
+    description: string | null;
     seq: number;
     createdAt: string;
     updatedAt: string;
@@ -25458,6 +26483,8 @@ export type MoveActivityResponse = MoveActivityResponses[keyof MoveActivityRespo
 export type CreateActivityData = {
   body: {
     settings?: JsonValueInput;
+    publishedAt?: string;
+    scheduledAt?: string | null;
     assetIds?: Array<string>;
   };
   path: {
@@ -25537,6 +26564,7 @@ export type CreateActivityResponses = {
     id: string;
     courseId: string;
     title: string;
+    description: string | null;
     seq: number;
     createdAt: string;
     updatedAt: string;
@@ -25617,6 +26645,7 @@ export type DeleteActivityResponses = {
     id: string;
     courseId: string;
     title: string;
+    description: string | null;
     seq: number;
     createdAt: string;
     updatedAt: string;
@@ -25628,6 +26657,8 @@ export type DeleteActivityResponse = DeleteActivityResponses[keyof DeleteActivit
 export type UpdateActivityData = {
   body: {
     settings?: JsonValueInput;
+    publishedAt?: string;
+    scheduledAt?: string | null;
     assetIds?: Array<string>;
   };
   path: {
@@ -25708,6 +26739,7 @@ export type UpdateActivityResponses = {
     id: string;
     courseId: string;
     title: string;
+    description: string | null;
     seq: number;
     createdAt: string;
     updatedAt: string;

@@ -88,7 +88,7 @@ export const courseTools: Tool[] = [
     openWorld: false,
     input: UpdateModule.extend(ModulePathParam.shape),
     call: ({ courseId, moduleId, title }, { container, caller }) =>
-      container.content.updateModule(courseId, moduleId, title, caller.actor),
+      container.content.updateModule(courseId, moduleId, title, undefined, caller.actor),
   }),
   defineTool({
     name: 'reorder_modules',

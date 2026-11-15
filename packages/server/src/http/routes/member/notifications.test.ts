@@ -149,6 +149,12 @@ describe('member notification routes', () => {
     ]);
   });
 
+  it('passes bounded course and notification filters to the member reporting service', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/member/notifications?courseId=crs_1&notificationId=ntf_1&page=1&pageSize=1' });
+    expect(res.statusCode).toBe(200);
+    expect(last('notifications')).toEqual([{ courseId: 'crs_1', notificationId: 'ntf_1' }, { page: 1, pageSize: 1 }, MEMBER]);
+  });
+
   it('lists with no filters and reads unread=false as false', async () => {
     await app.inject({ method: 'GET', url: '/api/member/notifications?unread=false&scope=org' });
     expect(last('notifications')?.[0]).toEqual({ unread: false, scope: 'org' });

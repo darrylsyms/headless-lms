@@ -6,14 +6,18 @@ import {
   text,
   boolean,
   jsonb,
+  integer,
   timestamp,
   primaryKey,
   foreignKey,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import type { Connection } from "@headless-lms/core/schemas";
-import { organizations } from "./organizations.js";
+import { organizations, orgUsers } from "./organizations.js";
 import { credentials } from "./credentials.js";
+import { bundles, contentItems } from "./content.js";
 import type { Expect, NoDrift } from "./drift.js";
 
 export const connections = pgTable(
@@ -44,3 +48,81 @@ export const connections = pgTable(
 );
 
 type _ConnectionsDrift = Expect<NoDrift<typeof connections.$inferSelect, Connection>>;
+
+export const purchaseSyncLedgers = pgTable(
+  "purchase_sync_ledgers",
+  {
+    orgId: text("org_id").notNull(),
+    orgUserId: text("org_user_id").notNull(),
+    integrationId: text("integration_id").notNull(),
+    revision: integer("revision").notNull().default(0),
+    state: jsonb("state").$type<{
+      capturedAt: number;
+      known: { course: string[]; subscription: string[] };
+      managed?: Partial<Record<"course" | "subscription", { id: string; version: string }>>;
+    } | null>(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.orgId, t.orgUserId, t.integrationId] }),
+    orgUserFk: foreignKey({
+      columns: [t.orgId, t.orgUserId],
+      foreignColumns: [orgUsers.orgId, orgUsers.id],
+    }).onDelete("cascade"),
+  }),
+);
+
+export const purchaseSyncCustomers = pgTable(
+  "purchase_sync_customers",
+  {
+    orgId: text("org_id").notNull(),
+    orgUserId: text("org_user_id").notNull(),
+    customerId: integer("customer_id").notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.orgId, t.orgUserId] }),
+    customerOnce: unique().on(t.orgId, t.customerId),
+    identity: unique().on(t.orgId, t.orgUserId, t.customerId),
+    userFk: foreignKey({
+      columns: [t.orgId, t.orgUserId],
+      foreignColumns: [orgUsers.orgId, orgUsers.id],
+    }).onDelete("cascade"),
+  }),
+);
+
+export const purchaseSyncMappings = pgTable(
+  "purchase_sync_mappings",
+  {
+    orgId: text("org_id").notNull(),
+    orgUserId: text("org_user_id").notNull(),
+    integrationId: text("integration_id").notNull(),
+    customerId: integer("customer_id").notNull(),
+    courseProductId: integer("course_product_id").notNull(),
+    subscriptionProductIds: jsonb("subscription_product_ids").$type<number[]>().notNull(),
+    courseId: text("course_id").notNull(),
+    bundleId: text("bundle_id").notNull(),
+    managesSubscription: boolean("manages_subscription").notNull().default(false),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.orgId, t.orgUserId, t.integrationId] }),
+    customerFk: foreignKey({
+      columns: [t.orgId, t.orgUserId, t.customerId],
+      foreignColumns: [
+        purchaseSyncCustomers.orgId,
+        purchaseSyncCustomers.orgUserId,
+        purchaseSyncCustomers.customerId,
+      ],
+    }).onDelete("cascade"),
+    courseFk: foreignKey({
+      columns: [t.orgId, t.courseId],
+      foreignColumns: [contentItems.orgId, contentItems.id],
+    }),
+    bundleFk: foreignKey({
+      columns: [t.orgId, t.bundleId],
+      foreignColumns: [bundles.orgId, bundles.id],
+    }),
+    courseOnce: unique().on(t.orgId, t.orgUserId, t.courseId),
+    bundleOnce: uniqueIndex("purchase_sync_mapping_bundle_owner_idx")
+      .on(t.orgId, t.orgUserId, t.bundleId)
+      .where(sql`${t.managesSubscription}`),
+  }),
+);

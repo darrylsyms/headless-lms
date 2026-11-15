@@ -40,13 +40,14 @@ const logger = {
   child: () => logger,
 };
 
-function memoryAuth() {
-  const options = buildAuthOptions({
+function authOptions(externalIdentity?: CreateAuthOptions["externalIdentity"]) {
+  return buildAuthOptions({
     db: {} as NodePgDatabase,
     baseUrl: "http://localhost:8100",
     secret: "a".repeat(32),
     trustedOrigins: [],
     logger: logger as unknown as CreateAuthOptions["logger"],
+    externalIdentity,
     hooks: { beforeUserCreate: noop } as unknown as CreateAuthOptions["hooks"],
     mcp: {
       oauthEnabled: true,
@@ -56,9 +57,31 @@ function memoryAuth() {
       orgPickerPage: "http://localhost:8101/onboarding/select-organization",
     },
   });
+}
+
+function memoryAuth() {
+  const options = authOptions();
   const tables = Object.fromEntries(Object.keys(getSchema(options)).map((model) => [model, []]));
   return betterAuth({ ...options, database: memoryAdapter(tables), telemetry: { enabled: false } });
 }
+
+describe("external sign-in configuration", () => {
+  it("is disabled by default and requires verified, prelinked identities when enabled", () => {
+    const unconfigured = authOptions();
+    expect(unconfigured.plugins.some((plugin) => plugin.id === "generic-oauth")).toBe(false);
+    const options = authOptions({
+      providerId: "test-provider", clientId: "test-client", clientSecret: "test-secret",
+      discoveryUrl: "https://identity.example.test/.well-known/openid-configuration",
+      redirectURI: "http://localhost:8100/api/auth/callback/test-provider",
+      scopes: ["openid"], getUserInfo: async () => null,
+    });
+    expect(options.account?.accountLinking).toEqual({ enabled: false, disableImplicitLinking: true });
+    const plugin = options.plugins.find((item) => item.id === "generic-oauth");
+    expect(plugin).toBeDefined();
+    const settings = (plugin as { options?: { config: Record<string, unknown>[] } }).options?.config[0];
+    expect(settings).toMatchObject({ requireIdTokenVerification: true, pkce: true, disableSignUp: true, disableProviderLogout: true });
+  });
+});
 
 async function register(body: Record<string, unknown>) {
   const res = await memoryAuth().handler(

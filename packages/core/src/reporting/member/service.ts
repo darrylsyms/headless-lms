@@ -99,6 +99,7 @@ type MemberAccess = Pick<
 type MemberContent = Pick<
   ContentServicePort,
   | 'findCourse'
+  | 'getInsiderFeed'
   | 'listCourseModules'
   | 'listCourseActivityViews'
   | 'listCourseActivities'
@@ -302,6 +303,9 @@ export class MemberReportServiceImpl implements MemberReportService {
     page: { page: number; pageSize: number },
     actor: MemberActor,
   ): Promise<NotificationsView> {
+    if (filter.courseId) {
+      await this.requireCourse(filter.courseId, actor);
+    }
     const listed = await this.notificationList.list(filter, page, actor);
     return {
       rows: await this.describeNotifications(actor, listed.items),
@@ -398,8 +402,20 @@ export class MemberReportServiceImpl implements MemberReportService {
   async listCourses(actor: Actor): Promise<CourseView[]> {
     const ids = await this.access.listAccessibleContent(actor.orgId, actor.id, 'course');
     const system = this.system(actor);
-    const courses = await Promise.all(ids.map((id) => this.content.findCourse(id, system)));
+    const feed = await this.content.getInsiderFeed(system);
+    const courses = await Promise.all(ids.filter((id) => id !== feed?.courseId).map((id) => this.content.findCourse(id, system)));
     return courses.filter((c): c is CourseView => c !== null && c.status === 'published');
+  }
+
+  async insiderFeed(actor: Actor): Promise<{ courseId: string; moduleId: string } | null> {
+    const feed = await this.content.getInsiderFeed(this.system(actor));
+    if (!feed) {
+      return null;
+    }
+    if (!(await this.opensCourse(feed.courseId, actor))) {
+      throw new NotFoundError('Insider Feed', feed.courseId);
+    }
+    return feed;
   }
 
   private async requireCourse(courseId: string, actor: Actor): Promise<CourseView> {

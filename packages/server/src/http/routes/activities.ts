@@ -125,7 +125,7 @@ export async function activitiesRoutes(app: FastifyInstance, container: Containe
     schema: {
       operationId: 'updateModule',
       tags,
-      summary: 'Rename a module',
+      summary: 'Edit a module',
       description: `Requires \`courses:write\`. Returns the course's modules.`,
       params: ModulePathParam,
       body: UpdateModule,
@@ -133,7 +133,7 @@ export async function activitiesRoutes(app: FastifyInstance, container: Containe
     },
     handler: async (req) => {
       const actor = await resolveActor(container, req);
-      return content.updateModule(req.params.courseId, req.params.moduleId, req.body.title, actor);
+      return content.updateModule(req.params.courseId, req.params.moduleId, req.body.title, req.body.description, actor);
     },
   });
 

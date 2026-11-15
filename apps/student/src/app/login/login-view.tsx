@@ -8,7 +8,7 @@ import { signIn, useSession } from "@/lib/auth/client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export function LoginView() {
+export function LoginView({ stagingWordPress = false }: { stagingWordPress?: boolean }) {
   const router = useRouter();
   const params = useSearchParams();
   // Where the proxy wanted the user to land before it bounced them here.
@@ -16,14 +16,36 @@ export function LoginView() {
   const nextParam = params.get("next");
   const next =
     nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/";
+  const returnParam = params.get("fretwiseReturn");
+  let localReturn: string | null = null;
+  if (process.env.NODE_ENV === "development" && returnParam?.startsWith("/") && !returnParam.startsWith("//")) {
+    try {
+      const destination = new URL(returnParam, "http://localhost:3020");
+      if (destination.origin === "http://localhost:3020") localReturn = destination.href;
+    } catch {}
+  }
+  const destination = localReturn || next;
+  const stagingSignIn = new URL("http://localhost:8017/start");
+  if (localReturn && returnParam) stagingSignIn.searchParams.set("returnTo", returnParam);
+  else {
+    stagingSignIn.searchParams.set("target", "student");
+    stagingSignIn.searchParams.set("returnTo", next);
+  }
+  function finishSignIn() {
+    if (localReturn) window.location.replace(localReturn);
+    else router.replace(next);
+  }
   const { data: session } = useSession();
 
   // A session that reaches this page is one worth honouring. Anything the API
   // rejected was revoked at `/session/reset` before the browser got here, so
   // there is no stale-but-truthy case to second-guess.
   useEffect(() => {
-    if (session) router.replace(next);
-  }, [session, router, next]);
+    if (session) {
+      if (destination.startsWith("http://localhost:3020/")) window.location.replace(destination);
+      else router.replace(destination);
+    }
+  }, [session, router, destination]);
 
   return (
     <div className="grid min-h-dvh lg:grid-cols-2">
@@ -42,7 +64,8 @@ export function LoginView() {
                 Welcome back. Enter your credentials to continue your courses.
               </p>
             </div>
-            <SignInForm onDone={() => router.replace(next)} />
+            <SignInForm onDone={finishSignIn} />
+            {stagingWordPress && <Button asChild variant="outline" className="mt-4 w-full"><a href={stagingSignIn.href}>Sign in with Fretwise</a></Button>}
           </div>
         </div>
       </div>

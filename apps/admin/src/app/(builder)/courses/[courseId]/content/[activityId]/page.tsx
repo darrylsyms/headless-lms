@@ -12,9 +12,9 @@ export default async function ActivityBuilderPage({
   searchParams,
 }: {
   params: Promise<{ courseId: string; activityId: string }>;
-  searchParams: Promise<{ panel?: string }>;
+  searchParams: Promise<{ panel?: string; feed?: string }>;
 }) {
-  const [{ courseId, activityId }, { panel }] = await Promise.all([params, searchParams]);
+  const [{ courseId, activityId }, { panel, feed }] = await Promise.all([params, searchParams]);
 
   const loaded = await loadActivity(courseId, activityId);
   if (!loaded) return <ForbiddenView description="You don't have access to manage this course." />;
@@ -31,6 +31,7 @@ export default async function ActivityBuilderPage({
   return (
     <ActivityBuilder
       key={activity.id}
+      isFeed={feed === "1"}
       course={{ id: course.id, title: course.title }}
       modules={modules}
       moduleId={parent.id}

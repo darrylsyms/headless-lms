@@ -3,7 +3,7 @@ export { ContentService } from './service.js';
 export { CommunityNotificationCategories } from './notification-categories.js';
 export { ContentItemTitles, activityTitle } from './titles.js';
 export { eventSight, type EventSight } from './event-sight.js';
-export { contentJobs, EVENT_LEADS, EVENT_STARTING_SOON_JOB } from './jobs.js';
+export { contentJobs, contentRecurringJobs, EVENT_LEADS, EVENT_STARTING_SOON_JOB } from './jobs.js';
 export type {
   BundlesService,
   CommunitiesService,
@@ -122,3 +122,4 @@ export type {
   CommunitySpacesReordered,
   ContentEvent,
 } from './events.js';
+export { CourseCategories, type CourseCategoriesRepository } from './course-categories.js';

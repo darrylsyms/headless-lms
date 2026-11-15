@@ -14,6 +14,7 @@ import {
   inArray,
   gt,
   lt,
+  lte,
   type SQL,
   type AnyColumn,
 } from "drizzle-orm";
@@ -93,6 +94,7 @@ import {
   spaces,
 } from "../schema/content.js";
 import { settings } from "../schema/settings.js";
+import { organizations } from "../schema/organizations.js";
 import { posts } from "../schema/discussion.js";
 import { deepMerge } from "./settings.js";
 import { genId } from "@headless-lms/core/shared/id";
@@ -243,11 +245,70 @@ export class DrizzleContentRepository implements ContentRepository {
     return (this.db as NodePgDatabase).transaction(fn);
   }
 
+  async getInsiderFeed(orgId: string): Promise<{ courseId: string; moduleId: string } | null> {
+    const [row] = await this.db.select().from(settings).where(and(
+      eq(settings.orgId, orgId), eq(settings.namespace, "insider_feed"), eq(settings.scopeId, orgId),
+    ));
+    const value = row?.value as { courseId?: unknown; moduleId?: unknown } | undefined;
+    return typeof value?.courseId === "string" && typeof value.moduleId === "string"
+      ? { courseId: value.courseId, moduleId: value.moduleId }
+      : null;
+  }
+
+  async ensureInsiderFeed(orgId: string): Promise<{ courseId: string; moduleId: string }> {
+    return this.tx(async (tx) => {
+      await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, orgId)).for("update");
+      const repo = new DrizzleContentRepository(tx, this.logger);
+      const existing = await repo.getInsiderFeed(orgId);
+      if (existing) {return existing;}
+      const courseId = genId("course");
+      const moduleId = genId("module");
+      await tx.insert(contentItems).values({ orgId, id: courseId, type: "course" });
+      await tx.insert(courses).values({ orgId, id: courseId, title: "Insider Feed", slug: `insider-feed-${courseId}`, status: "published", publishedAt: new Date() });
+      await tx.insert(modules).values({ orgId, id: moduleId, courseId, title: "Insider Feed", seq: 0 });
+      await tx.insert(settings).values([
+        { orgId, namespace: "insider_feed", scopeId: orgId, value: { courseId, moduleId } },
+        { orgId, namespace: SETTINGS_NAMESPACE, scopeId: courseId, value: { transcriptDownloads: false, comments: { enabled: true, threaded: true, requireReview: false, reactions: true } } },
+      ]);
+      return { courseId, moduleId };
+    });
+  }
+
+  async publishDueCourses(now: Date): Promise<Course[]> {
+    const rows = await this.db
+      .update(courses)
+      .set({
+        status: "published",
+        publishedAt: sql`${courses.scheduledAt}`,
+        scheduledAt: null,
+        updatedAt: now,
+      })
+      .where(and(eq(courses.status, "draft"), lte(courses.scheduledAt, now)))
+      .returning({ orgId: courses.orgId, id: courses.id });
+    const found = await Promise.all(rows.map((row) => this.findCourseById(row.orgId, row.id)));
+    return found.filter((course): course is Course => course !== null);
+  }
+
+  async publishDueActivities(now: Date): Promise<Activity[]> {
+    return this.db
+      .update(activities)
+      .set({
+        settings: sql`jsonb_set(coalesce(${activities.settings}, '{}'::jsonb), '{published}', 'true'::jsonb)`,
+        publishedAt: sql`${activities.scheduledAt}`,
+        scheduledAt: null,
+        updatedAt: now,
+      })
+      .where(
+        and(sql`${activities.settings}->>'published' = 'false'`, lte(activities.scheduledAt, now)),
+      )
+      .returning();
+  }
+
   async listCourses(orgId: string, query: ListCoursesQuery, ids?: string[]): Promise<Page<Course>> {
     if (ids?.length === 0) {
       return { rows: [], total: 0, page: query.page, pageSize: query.pageSize };
     }
-    const conditions: SQL[] = [eq(courses.orgId, orgId)];
+    const conditions: SQL[] = [eq(courses.orgId, orgId), sql`not exists (select 1 from settings as feed where feed.org_id = ${courses.orgId} and feed.namespace = 'insider_feed' and feed.scope_id = ${courses.orgId} and feed.value->>'courseId' = ${courses.id})`];
     if (ids) {
       conditions.push(inArray(courses.id, ids));
     }
@@ -312,6 +373,24 @@ export class DrizzleContentRepository implements ContentRepository {
     return row ? toCourse(row.course, row.settingsValue) : null;
   }
 
+  async lockCourseById(orgId: string, id: string): Promise<Course | null> {
+    await this.db
+      .select({ id: courses.id })
+      .from(courses)
+      .where(and(eq(courses.orgId, orgId), eq(courses.id, id)))
+      .for("update");
+    return this.findCourseById(orgId, id);
+  }
+
+  async lockActivity(orgId: string, activityId: string): Promise<Activity | null> {
+    const [row] = await this.db
+      .select()
+      .from(activities)
+      .where(and(eq(activities.orgId, orgId), eq(activities.id, activityId)))
+      .for("update");
+    return row ?? null;
+  }
+
   async createCourse(orgId: string, input: CreateCourseInput, slug: string): Promise<Course> {
     // Registry row + concrete row share one id. Both inserts run on the same
     // executor — mutations reach this repository tx-bound (ContentUnitOfWork),
@@ -327,6 +406,7 @@ export class DrizzleContentRepository implements ContentRepository {
         slug,
         description: input.description ?? "",
         category: input.category ?? "",
+        difficulty: input.difficulty ?? "all_levels",
       })
       .returning({ id: courses.id });
     if (!inserted) {
@@ -349,6 +429,15 @@ export class DrizzleContentRepository implements ContentRepository {
     }
     if (patch.category !== undefined) {
       set.category = patch.category;
+    }
+    if (patch.difficulty !== undefined) {
+      set.difficulty = patch.difficulty;
+    }
+    if (patch.scheduledAt !== undefined) {
+      set.scheduledAt = patch.scheduledAt === null ? null : new Date(patch.scheduledAt);
+    }
+    if (patch.publishedAt !== undefined) {
+      set.publishedAt = new Date(patch.publishedAt);
     }
     if (patch.status !== undefined) {
       set.status = patch.status;
@@ -522,12 +611,13 @@ export class DrizzleContentRepository implements ContentRepository {
     courseId: string,
     moduleId: string,
     title: string,
+    description?: string | null,
   ): Promise<Module[]> {
     return this.tx(async (tx) => {
       await this.assertModule(tx, orgId, courseId, moduleId);
       await tx
         .update(modules)
-        .set({ title })
+        .set({ title, ...(description !== undefined ? { description } : {}) })
         .where(
           and(eq(modules.orgId, orgId), eq(modules.id, moduleId), eq(modules.courseId, courseId)),
         );
@@ -723,7 +813,15 @@ export class DrizzleContentRepository implements ContentRepository {
 
         await tx
           .update(activities)
-          .set({ settings: input.settings ?? null })
+          .set({
+            settings: input.settings ?? null,
+            ...(input.publishedAt !== undefined
+              ? { publishedAt: new Date(input.publishedAt) }
+              : {}),
+            ...(input.scheduledAt !== undefined
+              ? { scheduledAt: input.scheduledAt === null ? null : new Date(input.scheduledAt) }
+              : {}),
+          })
           .where(and(eq(activities.orgId, orgId), eq(activities.id, activityId)));
         if (input.assetIds !== undefined) {
           await this.replaceActivityAssets(tx, orgId, activityId, input.assetIds);
@@ -738,7 +836,19 @@ export class DrizzleContentRepository implements ContentRepository {
 
         const [ins] = await tx
           .insert(activities)
-          .values({ orgId, moduleId, courseId, seq: nextSeq, settings: input.settings ?? null })
+          .values({
+            orgId,
+            moduleId,
+            courseId,
+            seq: nextSeq,
+            settings: input.settings ?? null,
+            ...(input.publishedAt !== undefined
+              ? { publishedAt: new Date(input.publishedAt) }
+              : {}),
+            ...(input.scheduledAt !== undefined
+              ? { scheduledAt: input.scheduledAt === null ? null : new Date(input.scheduledAt) }
+              : {}),
+          })
           .returning({ id: activities.id });
         if (!ins) {
           throw new Error("failed to insert activity");

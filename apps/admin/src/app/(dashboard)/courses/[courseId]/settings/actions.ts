@@ -39,3 +39,10 @@ export async function setCommentsSettingsAction(
   revalidatePath("/courses/[courseId]/discussion", "page");
   return settings;
 }
+
+export async function setSongLibraryAction(courseId: string, songLibrary: boolean): Promise<CourseSettings> {
+  const settings = await Content.updateCourseSettings({ id: courseId, songLibrary }, await authHeaders());
+  revalidatePath("/courses/[courseId]/settings", "page");
+  revalidatePath("/courses");
+  return settings;
+}

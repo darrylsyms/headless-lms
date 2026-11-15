@@ -138,6 +138,9 @@ export const notifications = pgTable(
     listIdx: index("notifications_list_idx")
       .on(t.orgId, t.userId, desc(t.createdAt), desc(t.id))
       .where(sql`${t.inApp}`),
+    activityIdx: index("notifications_course_activity_idx")
+      .on(t.orgId, t.userId, t.parentType, t.parentId)
+      .where(sql`${t.inApp}`),
     communityIdx: index("notifications_community_idx").on(t.orgId, t.userId, t.communityId),
     categoryIdx: index("notifications_category_idx").on(t.orgId, t.userId, t.category),
     reasonsIdx: index("notifications_reasons_idx").using("gin", t.reasons),

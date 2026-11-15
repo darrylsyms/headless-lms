@@ -33,6 +33,7 @@ export interface MemberReportService {
   /** Who the caller is in the org, and the permissions they hold. */
   viewer(actor: Actor): MemberViewer;
   listCourses(actor: Actor): Promise<CourseView[]>;
+  insiderFeed(actor: Actor): Promise<{ courseId: string; moduleId: string } | null>;
   getCourse(courseId: string, actor: Actor): Promise<CourseView>;
   listModules(courseId: string, actor: Actor): Promise<Module[]>;
   listActivities(courseId: string, actor: Actor): Promise<ActivityView[]>;

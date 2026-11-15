@@ -16,7 +16,7 @@ import type {
   SaveActivityInput,
 } from "@/lib/api/types";
 
-import { activityAssetIds } from "./_lib/activity-asset-ids";
+import { activityAssetIds, activityAssetIdsWithArtwork } from "./_lib/activity-asset-ids";
 import { saveRefusal, type SaveRefusal } from "./_lib/save-refusal";
 
 /**
@@ -29,6 +29,7 @@ function revalidateBuilder(): void {
   revalidatePath("/courses/[courseId]", "page");
   revalidatePath("/courses/[courseId]/content/[activityId]", "page");
   revalidatePath("/courses");
+  revalidatePath("/insider-feed");
 }
 
 // --- modules ---------------------------------------------------------------
@@ -52,8 +53,9 @@ export async function updateModuleAction(
   courseId: string,
   moduleId: string,
   title: string,
+  description?: string | null,
 ): Promise<Module[]> {
-  const modules = await Content.updateModule({ courseId, moduleId, title }, await authHeaders());
+  const modules = await Content.updateModule({ courseId, moduleId, title, ...(description !== undefined ? { description } : {}) }, await authHeaders());
   revalidateBuilder();
   return modules;
 }
@@ -116,17 +118,35 @@ export async function updateActivitySettingsAction(
   moduleId: string,
   activityId: string,
   patch: Partial<ActivitySettings>,
+  publishedAt?: string,
+  scheduledAt?: string | null,
 ): Promise<SaveRefusal | null> {
   const headers = await authHeaders();
   const activities = await Content.listActivities({ courseId }, headers);
   const activity = activities.find((a) => a.id === activityId && a.moduleId === moduleId);
   if (!activity) throw new Error("Activity not found");
 
-  const settings: ActivitySettings = {
-    ...((activity.settings ?? {}) as ActivitySettings),
-    ...patch,
-  };
-  const assetIds = patch.content ? activityAssetIds(editorModule, settings.content) : undefined;
+  const previous = (activity.settings ?? {}) as ActivitySettings;
+  const settings: ActivitySettings = { ...previous, ...patch };
+  const contentIds = patch.content ? activityAssetIds(editorModule, settings.content) : undefined;
+  let assetIds: string[] | undefined;
+  if (patch.thumbnailAssetId !== undefined) {
+    const links = await Content.listActivityAssets({ courseId }, headers);
+    const currentIds = links.filter((link) => link.activityId === activityId).map((link) => link.assetId);
+    const embedded = activityAssetIds(editorModule, settings.content);
+    assetIds = activityAssetIdsWithArtwork(
+      contentIds,
+      currentIds,
+      previous.thumbnailAssetId,
+      settings.thumbnailAssetId,
+      !settings.content || embedded !== undefined,
+    );
+    if (previous.thumbnailAssetId && embedded?.includes(previous.thumbnailAssetId) && !assetIds.includes(previous.thumbnailAssetId)) {
+      assetIds.push(previous.thumbnailAssetId);
+    }
+  } else if (contentIds) {
+    assetIds = activityAssetIdsWithArtwork(contentIds, [], null, settings.thumbnailAssetId, true);
+  }
   try {
     await Content.updateActivity(
       {
@@ -134,6 +154,8 @@ export async function updateActivitySettingsAction(
         moduleId,
         activityId,
         settings: settings as JsonValueInput,
+        ...(publishedAt ? { publishedAt } : {}),
+        ...(scheduledAt !== undefined ? { scheduledAt } : {}),
         ...(assetIds ? { assetIds } : {}),
       },
       headers,
@@ -210,7 +232,12 @@ export async function duplicateCourseAction(courseId: string): Promise<Course> {
   ]);
 
   const copy = await Content.createCourse(
-    { title: `${course.title} (copy)`, description: course.description, category: course.category },
+    {
+      title: `${course.title} (copy)`,
+      description: course.description,
+      category: course.category,
+      difficulty: course.difficulty,
+    },
     headers,
   );
   await Content.updateCourseSettings({ id: copy.id, ...course.settings }, headers);
@@ -268,13 +295,16 @@ export async function updateCourseSettingsAction(
 /** Edit course details (title / category / description) from the builder sheet. */
 export async function updateCourseDetailsAction(
   courseId: string,
-  patch: { title: string; category: string; description: string },
+  patch: { title: string; category: string; difficulty: Course["difficulty"]; description: string; publishedAt?: string; scheduledAt?: string | null },
 ): Promise<Course> {
   const course = await Content.updateCourse(
     {
       id: courseId,
       title: patch.title,
       category: patch.category,
+      difficulty: patch.difficulty,
+      publishedAt: patch.publishedAt,
+      scheduledAt: patch.scheduledAt,
       description: patch.description,
     },
     await authHeaders(),

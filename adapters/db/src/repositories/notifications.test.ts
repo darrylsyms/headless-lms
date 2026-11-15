@@ -117,6 +117,18 @@ describe("DrizzleNotificationsRepository deliveries", () => {
 });
 
 describe("DrizzleNotificationsRepository list", () => {
+  it("restricts course notifications and their count to published lesson comments", async () => {
+    const { repo, statements } = capture();
+    await repo.page("org_1", "usr_1", { courseId: "crs_1" }, { page: 1, pageSize: 1 });
+    expect(statements).toHaveLength(2);
+    for (const statement of statements) {
+      expect(statement.text).toContain("exists (select 1 from activities a join comments c");
+      expect(statement.text).toContain("a.course_id = $");
+      expect(statement.text).toContain("c.status = 'published'");
+      expect(statement.params).toContain("crs_1");
+    }
+  });
+
   it("filters in-app rows by scope, community, categories, reasons, types and unread, newest first", async () => {
     const { repo, statements } = capture((text) => (text.includes("count(*)") ? [[4, 1]] : []));
     await expect(

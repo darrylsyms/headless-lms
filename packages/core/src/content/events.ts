@@ -43,6 +43,9 @@ const publicCourse = courseSchema
     description: true,
     status: true,
     category: true,
+    difficulty: true,
+    publishedAt: true,
+    scheduledAt: true,
     thumbnailAssetId: true,
     settings: true,
     createdAt: true,
@@ -69,6 +72,8 @@ const publicActivity = activitySchema
     moduleId: true,
     courseId: true,
     seq: true,
+    publishedAt: true,
+    scheduledAt: true,
     createdAt: true,
     updatedAt: true,
   })

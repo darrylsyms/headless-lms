@@ -28,6 +28,7 @@ export function FormDialog({
   submitLabel = "Save",
   pending = false,
   submitDisabled = false,
+  footerStart,
   children,
 }: {
   open: boolean;
@@ -38,13 +39,11 @@ export function FormDialog({
   submitLabel?: string;
   pending?: boolean;
   submitDisabled?: boolean;
+  footerStart?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <Dialog open={open} onOpenChange={(o) => !pending && onOpenChange(o)}>
-      {/* Capped and row-sized so only the body scrolls — some of these forms
-          are long enough to outrun the viewport, and the footer's submit has to
-          stay reachable. `pr-1 -mr-1` keeps focus rings off the scrollbar. */}
       <DialogContent
         showCloseButton={!pending}
         className="max-h-[85dvh] grid-rows-[auto_minmax(0,1fr)_auto] sm:max-w-lg"
@@ -53,8 +52,9 @@ export function FormDialog({
           <DialogTitle>{title}</DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>
-        <div className="-mr-1 min-h-0 overflow-y-auto pr-1">{children}</div>
+        <div className="-m-1 min-h-0 overflow-y-auto p-1">{children}</div>
         <DialogFooter>
+          {footerStart && <div className="sm:mr-auto">{footerStart}</div>}
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={pending}>
             Cancel
           </Button>

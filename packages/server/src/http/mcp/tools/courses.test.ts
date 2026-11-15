@@ -45,7 +45,7 @@ const cases: ToolCase[] = [
     tool: 'rename_module',
     args: { courseId: 'crs_1', moduleId: 'mod_1', title: 'Week one' },
     service: 'content.updateModule',
-    expected: ['crs_1', 'mod_1', 'Week one', OWNER],
+    expected: ['crs_1', 'mod_1', 'Week one', undefined, OWNER],
     returns: [{ id: 'mod_1' }],
   },
   {

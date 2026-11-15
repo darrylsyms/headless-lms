@@ -30,9 +30,11 @@ function countParams(base: ListParams, filters: Record<string, string[]>): ListP
 export default async function CourseCommentsTab({
   params,
   searchParams,
+  pathOverride,
 }: {
   params: Promise<{ courseId: string }>;
   searchParams: Promise<RawSearchParams>;
+  pathOverride?: string;
 }) {
   const { courseId } = await params;
   await requirePermission("courses:moderate", courseId);
@@ -51,7 +53,7 @@ export default async function CourseCommentsTab({
     serverApi.listComments(courseId, countParams(listParams, { reported: ["true"] })),
   ]);
 
-  const path = basePath(courseId);
+  const path = pathOverride ?? basePath(courseId);
   const nodes = nest(page.rows);
   const selectableIds = nodes.map((n) => n.comment.id);
   const lastPage = Math.max(1, Math.ceil(page.total / listParams.pageSize));

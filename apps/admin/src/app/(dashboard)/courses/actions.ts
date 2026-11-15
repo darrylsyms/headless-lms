@@ -60,3 +60,18 @@ export async function deleteCourseAction(id: string): Promise<void> {
   await Content.deleteCourse({ id }, await authHeaders());
   revalidateCourse();
 }
+
+export async function changeCourseCategoryAction(
+  name: string,
+  previous?: string,
+): Promise<string[]> {
+  const categories = await Content.changeCourseCategory({ name, previous }, await authHeaders());
+  revalidatePath("/courses", "layout");
+  return categories;
+}
+
+export async function deleteCourseCategoryAction(name: string): Promise<string[]> {
+  const categories = await Content.deleteCourseCategory({ name }, await authHeaders());
+  revalidatePath("/courses", "layout");
+  return categories;
+}

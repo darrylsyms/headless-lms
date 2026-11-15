@@ -351,6 +351,121 @@ export class DrizzleEntitlementsRepository implements EntitlementsRepository {
     return row ? toEntitlement(row) : null;
   }
 
+  async insertIntegrationGrant(
+    orgId: string,
+    input: {
+      orgUserId: string;
+      contentId?: string | null;
+      bundleId?: string | null;
+      source: string;
+    },
+  ): Promise<Entitlement | null> {
+    const contentId = input.contentId ?? null;
+    const bundleId = input.bundleId ?? null;
+    if (
+      (contentId === null) === (bundleId === null) ||
+      !input.source.startsWith("integration:") ||
+      input.source.length <= "integration:".length
+    ) {
+      throw new Error("Invalid integration grant.");
+    }
+    const [row] = await orgUserMustExist(
+      input.orgUserId,
+      this.db
+        .insert(entitlements)
+        .values({
+          orgId,
+          orgUserId: input.orgUserId,
+          contentId,
+          bundleId,
+          source: input.source,
+          status: "active",
+          expiresAt: null,
+          updatedAt: new Date(),
+        })
+        .onConflictDoNothing()
+        .returning(selection),
+    );
+    return row ? toEntitlement(row) : null;
+  }
+
+  async lockIntegrationGrant(
+    orgId: string,
+    key: GrantKey,
+  ): Promise<{ grant: Entitlement; version: string } | null> {
+    const target = key.bundleId
+      ? eq(entitlements.bundleId, key.bundleId)
+      : key.contentId
+        ? eq(entitlements.contentId, key.contentId)
+        : undefined;
+    if (!target) {return null;}
+    const [row] = await this.db
+      .select({ ...selection, version: sql<string>`xmin::text` })
+      .from(entitlements)
+      .where(and(eq(entitlements.orgId, orgId), eq(entitlements.orgUserId, key.orgUserId), target))
+      .for("update")
+      .limit(1);
+    return row ? { grant: toEntitlement(row), version: row.version } : null;
+  }
+
+  async transitionIntegrationGrantVersion(
+    orgId: string,
+    input: { id: string; source: string; version: string; status: "active" | "revoked" },
+  ): Promise<Entitlement | null> {
+    if (
+      !input.source.startsWith("integration:") ||
+      input.source.length <= "integration:".length ||
+      !/^\d+$/.test(input.version)
+    )
+      {throw new Error("Invalid integration grant transition.");}
+    const [row] = await this.db
+      .update(entitlements)
+      .set({ status: input.status })
+      .where(
+        and(
+          eq(entitlements.orgId, orgId),
+          eq(entitlements.id, input.id),
+          eq(entitlements.source, input.source),
+          sql`xmin::text = ${input.version}`,
+        ),
+      )
+      .returning(selection);
+    return row ? toEntitlement(row) : null;
+  }
+
+  async transitionIntegrationGrant(
+    orgId: string,
+    input: {
+      id: string;
+      source: string;
+      expectedStatus: "active" | "revoked";
+      expectedUpdatedAt: Date;
+      status: "active" | "revoked";
+    },
+  ): Promise<Entitlement | null> {
+    if (
+      !input.source.startsWith("integration:") ||
+      input.source.length <= "integration:".length ||
+      !Number.isFinite(input.expectedUpdatedAt.getTime())
+    ) {
+      throw new Error("Invalid integration grant transition.");
+    }
+    const [row] = await this.db
+      .update(entitlements)
+      .set({ status: input.status })
+      .where(
+        and(
+          eq(entitlements.orgId, orgId),
+          eq(entitlements.id, input.id),
+          eq(entitlements.source, input.source),
+          eq(entitlements.status, input.expectedStatus),
+          eq(entitlements.updatedAt, input.expectedUpdatedAt),
+        ),
+      )
+      .returning(selection);
+    return row ? toEntitlement(row) : null;
+  }
+
   async setStatus(
     orgId: string,
     id: string,

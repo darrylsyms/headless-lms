@@ -1,0 +1,2 @@
+CREATE INDEX "activities_scheduled_idx" ON "activities" USING btree ("scheduled_at") WHERE "activities"."scheduled_at" is not null;--> statement-breakpoint
+CREATE INDEX "courses_scheduled_idx" ON "courses" USING btree ("scheduled_at") WHERE "courses"."scheduled_at" is not null;

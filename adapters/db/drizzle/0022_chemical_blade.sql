@@ -1,0 +1,1 @@
+CREATE INDEX "notifications_course_activity_idx" ON "notifications" USING btree ("org_id","user_id","parent_type","parent_id") WHERE "notifications"."in_app";

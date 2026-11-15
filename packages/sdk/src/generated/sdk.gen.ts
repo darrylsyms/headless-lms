@@ -61,6 +61,10 @@ import type {
   CancelInviteResponses,
   CancelMemberEventErrors,
   CancelMemberEventResponses,
+  ChangeCourseCategoryErrors,
+  ChangeCourseCategoryResponses,
+  ChangeInsiderCategoryErrors,
+  ChangeInsiderCategoryResponses,
   ClearCommentReactionErrors,
   ClearCommentReactionResponses,
   ClearMessageReactionErrors,
@@ -133,12 +137,16 @@ import type {
   DeleteCommentResponses,
   DeleteCommunityErrors,
   DeleteCommunityResponses,
+  DeleteCourseCategoryErrors,
+  DeleteCourseCategoryResponses,
   DeleteCourseErrors,
   DeleteCourseResponses,
   DeleteDownloadErrors,
   DeleteDownloadResponses,
   DeleteEventErrors,
   DeleteEventResponses,
+  DeleteInsiderCategoryErrors,
+  DeleteInsiderCategoryResponses,
   DeleteMemberEventErrors,
   DeleteMemberEventResponses,
   DeleteMemberUploadErrors,
@@ -161,6 +169,8 @@ import type {
   EditChatMessageResponses,
   EditCommentErrors,
   EditCommentResponses,
+  EnsureInsiderFeedErrors,
+  EnsureInsiderFeedResponses,
   FinalizeMemberUploadErrors,
   FinalizeMemberUploadResponses,
   FlagMessageErrors,
@@ -210,6 +220,8 @@ import type {
   GetEventFileErrors,
   GetEventResponses,
   GetEventThumbnailErrors,
+  GetInsiderFeedErrors,
+  GetInsiderFeedResponses,
   GetInviteErrors,
   GetInviteResponses,
   GetLibraryFileErrors,
@@ -235,6 +247,8 @@ import type {
   GetMemberEventResponses,
   GetMemberFeedErrors,
   GetMemberFeedResponses,
+  GetMemberInsiderFeedErrors,
+  GetMemberInsiderFeedResponses,
   GetMemberMessageQueueErrors,
   GetMemberMessageQueueResponses,
   GetMemberNotificationErrors,
@@ -300,6 +314,8 @@ import type {
   ListActivityAssetsResponses,
   ListActivityCommentsErrors,
   ListActivityCommentsResponses,
+  ListAllSavedActivitiesErrors,
+  ListAllSavedActivitiesResponses,
   ListApiKeyRolesErrors,
   ListApiKeyRolesResponses,
   ListApiKeysErrors,
@@ -338,6 +354,8 @@ import type {
   ListConnectedAppsResponses,
   ListConnectionsErrors,
   ListConnectionsResponses,
+  ListCourseCategoriesErrors,
+  ListCourseCategoriesResponses,
   ListCourseLearnersErrors,
   ListCourseLearnersResponses,
   ListCoursesErrors,
@@ -354,6 +372,8 @@ import type {
   ListEventAttendeesResponses,
   ListEventsErrors,
   ListEventsResponses,
+  ListInsiderCategoriesErrors,
+  ListInsiderCategoriesResponses,
   ListMemberActivitiesErrors,
   ListMemberActivitiesResponses,
   ListMemberChatsErrors,
@@ -388,10 +408,14 @@ import type {
   ListPersonRolesResponses,
   ListPostCommentsErrors,
   ListPostCommentsResponses,
+  ListRecentActivitiesErrors,
+  ListRecentActivitiesResponses,
   ListRolesErrors,
   ListRolesOnErrors,
   ListRolesOnResponses,
   ListRolesResponses,
+  ListSavedActivitiesErrors,
+  ListSavedActivitiesResponses,
   ListSpaceMembersErrors,
   ListSpaceMembersResponses,
   ListStudentsErrors,
@@ -430,6 +454,8 @@ import type {
   PublishCommunityResponses,
   ReconnectIntegrationErrors,
   ReconnectIntegrationResponses,
+  RecordActivityViewErrors,
+  RecordActivityViewResponses,
   RefuseSpaceInviteErrors,
   RefuseSpaceInviteResponses,
   RegisterForEventErrors,
@@ -460,6 +486,8 @@ import type {
   RemovePersonResponses,
   RemovePostErrors,
   RemovePostResponses,
+  RemoveSavedActivityErrors,
+  RemoveSavedActivityResponses,
   RemoveSpaceLinkErrors,
   RemoveSpaceLinkResponses,
   RemoveSpaceMemberErrors,
@@ -560,6 +588,8 @@ import type {
   SetPostReactionResponses,
   SetPostSubscriptionErrors,
   SetPostSubscriptionResponses,
+  SetSavedActivityErrors,
+  SetSavedActivityResponses,
   SetSpaceSubscriptionErrors,
   SetSpaceSubscriptionResponses,
   SetSpaceTopicsErrors,
@@ -1807,7 +1837,7 @@ export class Notifications {
   /**
    * List your notifications, newest first, with the unread count of the same filters
    *
-   * For any member of the organization. Filters combine with AND; the values of one filter combine with OR, and `includeOrg=true` with `communityId` adds the org list, so one query reads a community with the course and account notifications. 400 for `includeOrg` without `communityId` or with `scope`. Each notification carries the current titles, names and excerpts of what it refers to; a subject or parent you can no longer open, or that was deleted, is null. `display` is the text stored when it was sent.
+   * For any member of the organization. Filters combine with AND; the values of one filter combine with OR, and `includeOrg=true` with `communityId` adds the org list, so one query reads a community with the course and account notifications. 400 for `includeOrg` without `communityId` or with `scope`. A course filter requires access and returns only published lesson comments. Each notification carries the current titles, names and excerpts of what it refers to; a subject or parent you can no longer open, or that was deleted, is null. `display` is the text stored when it was sent.
    */
   public static listMemberNotifications<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -1820,6 +1850,8 @@ export class Notifications {
       reason?: string;
       type?: string;
       unread?: string;
+      courseId?: string;
+      notificationId?: string;
     },
     options?: Options<never, ThrowOnError>,
   ): RequestResult<
@@ -1842,6 +1874,8 @@ export class Notifications {
             { in: "query", key: "reason" },
             { in: "query", key: "type" },
             { in: "query", key: "unread" },
+            { in: "query", key: "courseId" },
+            { in: "query", key: "notificationId" },
           ],
         },
       ],
@@ -2311,6 +2345,218 @@ export class Notifications {
 }
 
 export class Content {
+  public static getInsiderFeed<ThrowOnError extends boolean = false>(
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<GetInsiderFeedResponses, GetInsiderFeedErrors, ThrowOnError, "data"> {
+    return (options?.client ?? client).get<
+      GetInsiderFeedResponses,
+      GetInsiderFeedErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/insider-feed",
+      ...options,
+    });
+  }
+
+  public static ensureInsiderFeed<ThrowOnError extends boolean = false>(
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<EnsureInsiderFeedResponses, EnsureInsiderFeedErrors, ThrowOnError, "data"> {
+    return (options?.client ?? client).post<
+      EnsureInsiderFeedResponses,
+      EnsureInsiderFeedErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/insider-feed",
+      ...options,
+    });
+  }
+
+  public static deleteInsiderCategory<ThrowOnError extends boolean = false>(
+    parameters: {
+      name: string;
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<
+    DeleteInsiderCategoryResponses,
+    DeleteInsiderCategoryErrors,
+    ThrowOnError,
+    "data"
+  > {
+    const params = buildClientParams([parameters], [{ args: [{ in: "body", key: "name" }] }]);
+    return (options?.client ?? client).delete<
+      DeleteInsiderCategoryResponses,
+      DeleteInsiderCategoryErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/insider-categories",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    });
+  }
+
+  public static listInsiderCategories<ThrowOnError extends boolean = false>(
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<
+    ListInsiderCategoriesResponses,
+    ListInsiderCategoriesErrors,
+    ThrowOnError,
+    "data"
+  > {
+    return (options?.client ?? client).get<
+      ListInsiderCategoriesResponses,
+      ListInsiderCategoriesErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/insider-categories",
+      ...options,
+    });
+  }
+
+  public static changeInsiderCategory<ThrowOnError extends boolean = false>(
+    parameters: {
+      name: string;
+      previous?: string;
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<
+    ChangeInsiderCategoryResponses,
+    ChangeInsiderCategoryErrors,
+    ThrowOnError,
+    "data"
+  > {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "body", key: "name" },
+            { in: "body", key: "previous" },
+          ],
+        },
+      ],
+    );
+    return (options?.client ?? client).post<
+      ChangeInsiderCategoryResponses,
+      ChangeInsiderCategoryErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/insider-categories",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    });
+  }
+
+  public static deleteCourseCategory<ThrowOnError extends boolean = false>(
+    parameters: {
+      name: string;
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<
+    DeleteCourseCategoryResponses,
+    DeleteCourseCategoryErrors,
+    ThrowOnError,
+    "data"
+  > {
+    const params = buildClientParams([parameters], [{ args: [{ in: "body", key: "name" }] }]);
+    return (options?.client ?? client).delete<
+      DeleteCourseCategoryResponses,
+      DeleteCourseCategoryErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/course-categories",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    });
+  }
+
+  public static listCourseCategories<ThrowOnError extends boolean = false>(
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<
+    ListCourseCategoriesResponses,
+    ListCourseCategoriesErrors,
+    ThrowOnError,
+    "data"
+  > {
+    return (options?.client ?? client).get<
+      ListCourseCategoriesResponses,
+      ListCourseCategoriesErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/course-categories",
+      ...options,
+    });
+  }
+
+  public static changeCourseCategory<ThrowOnError extends boolean = false>(
+    parameters: {
+      name: string;
+      previous?: string;
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<
+    ChangeCourseCategoryResponses,
+    ChangeCourseCategoryErrors,
+    ThrowOnError,
+    "data"
+  > {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "body", key: "name" },
+            { in: "body", key: "previous" },
+          ],
+        },
+      ],
+    );
+    return (options?.client ?? client).post<
+      ChangeCourseCategoryResponses,
+      ChangeCourseCategoryErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/course-categories",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    });
+  }
+
   /**
    * List courses
    *
@@ -2365,6 +2611,7 @@ export class Content {
       title: string;
       description?: string;
       category?: string;
+      difficulty?: "all_levels" | "beginner" | "intermediate" | "advanced" | "expert";
     },
     options?: Options<never, ThrowOnError>,
   ): RequestResult<CreateCourseResponses, CreateCourseErrors, ThrowOnError, "data"> {
@@ -2376,6 +2623,7 @@ export class Content {
             { in: "body", key: "title" },
             { in: "body", key: "description" },
             { in: "body", key: "category" },
+            { in: "body", key: "difficulty" },
           ],
         },
       ],
@@ -2459,6 +2707,9 @@ export class Content {
       title?: string;
       description?: string;
       category?: string;
+      difficulty?: "all_levels" | "beginner" | "intermediate" | "advanced" | "expert";
+      publishedAt?: string;
+      scheduledAt?: string | null;
       status?: "draft" | "published";
       thumbnailAssetId?: string | null;
     },
@@ -2473,6 +2724,9 @@ export class Content {
             { in: "body", key: "title" },
             { in: "body", key: "description" },
             { in: "body", key: "category" },
+            { in: "body", key: "difficulty" },
+            { in: "body", key: "publishedAt" },
+            { in: "body", key: "scheduledAt" },
             { in: "body", key: "status" },
             { in: "body", key: "thumbnailAssetId" },
           ],
@@ -2506,6 +2760,7 @@ export class Content {
     parameters: {
       id: string;
       transcriptDownloads?: boolean;
+      songLibrary?: boolean;
       comments?: {
         enabled: boolean;
         threaded: boolean;
@@ -2527,6 +2782,7 @@ export class Content {
           args: [
             { in: "path", key: "id" },
             { in: "body", key: "transcriptDownloads" },
+            { in: "body", key: "songLibrary" },
             { in: "body", key: "comments" },
           ],
         },
@@ -3204,6 +3460,29 @@ export class Content {
   }
 
   /**
+   * Find the Insider Feed you can open
+   */
+  public static getMemberInsiderFeed<ThrowOnError extends boolean = false>(
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<
+    GetMemberInsiderFeedResponses,
+    GetMemberInsiderFeedErrors,
+    ThrowOnError,
+    "data"
+  > {
+    return (options?.client ?? client).get<
+      GetMemberInsiderFeedResponses,
+      GetMemberInsiderFeedErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/member/insider-feed",
+      ...options,
+    });
+  }
+
+  /**
    * List the courses you can open
    *
    * For a member of the organization. Published courses you hold, directly or through a bundle.
@@ -3542,7 +3821,7 @@ export class Content {
   }
 
   /**
-   * Rename a module
+   * Edit a module
    *
    * Requires `courses:write`. Returns the course's modules.
    */
@@ -3551,6 +3830,7 @@ export class Content {
       courseId: string;
       moduleId: string;
       title: string;
+      description?: string | null;
     },
     options?: Options<never, ThrowOnError>,
   ): RequestResult<UpdateModuleResponses, UpdateModuleErrors, ThrowOnError, "data"> {
@@ -3562,6 +3842,7 @@ export class Content {
             { in: "path", key: "courseId" },
             { in: "path", key: "moduleId" },
             { in: "body", key: "title" },
+            { in: "body", key: "description" },
           ],
         },
       ],
@@ -3684,6 +3965,8 @@ export class Content {
       courseId: string;
       moduleId: string;
       settings?: JsonValueInput;
+      publishedAt?: string;
+      scheduledAt?: string | null;
       assetIds?: Array<string>;
     },
     options?: Options<never, ThrowOnError>,
@@ -3696,6 +3979,8 @@ export class Content {
             { in: "path", key: "courseId" },
             { in: "path", key: "moduleId" },
             { in: "body", key: "settings" },
+            { in: "body", key: "publishedAt" },
+            { in: "body", key: "scheduledAt" },
             { in: "body", key: "assetIds" },
           ],
         },
@@ -3768,6 +4053,8 @@ export class Content {
       moduleId: string;
       activityId: string;
       settings?: JsonValueInput;
+      publishedAt?: string;
+      scheduledAt?: string | null;
       assetIds?: Array<string>;
     },
     options?: Options<never, ThrowOnError>,
@@ -3781,6 +4068,8 @@ export class Content {
             { in: "path", key: "moduleId" },
             { in: "path", key: "activityId" },
             { in: "body", key: "settings" },
+            { in: "body", key: "publishedAt" },
+            { in: "body", key: "scheduledAt" },
             { in: "body", key: "assetIds" },
           ],
         },
@@ -9291,6 +9580,103 @@ export class Chats {
 
 export class Progress {
   /**
+   * List your saved activities
+   */
+  public static listAllSavedActivities<ThrowOnError extends boolean = false>(
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<
+    ListAllSavedActivitiesResponses,
+    ListAllSavedActivitiesErrors,
+    ThrowOnError,
+    "data"
+  > {
+    return (options?.client ?? client).get<
+      ListAllSavedActivitiesResponses,
+      ListAllSavedActivitiesErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/member/saved-activities",
+      ...options,
+    });
+  }
+
+  /**
+   * Remove an activity from your list
+   */
+  public static removeSavedActivity<ThrowOnError extends boolean = false>(
+    parameters: {
+      activityId: string;
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<RemoveSavedActivityResponses, RemoveSavedActivityErrors, ThrowOnError, "data"> {
+    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "activityId" }] }]);
+    return (options?.client ?? client).delete<
+      RemoveSavedActivityResponses,
+      RemoveSavedActivityErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/member/saved-activities/{activityId}",
+      ...options,
+      ...params,
+    });
+  }
+
+  /**
+   * List recently viewed activities
+   */
+  public static listRecentActivities<ThrowOnError extends boolean = false>(
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<
+    ListRecentActivitiesResponses,
+    ListRecentActivitiesErrors,
+    ThrowOnError,
+    "data"
+  > {
+    return (options?.client ?? client).get<
+      ListRecentActivitiesResponses,
+      ListRecentActivitiesErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/member/recent-activities",
+      ...options,
+    });
+  }
+
+  /**
+   * Record an activity view
+   */
+  public static recordActivityView<ThrowOnError extends boolean = false>(
+    parameters: {
+      activity: string;
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<RecordActivityViewResponses, RecordActivityViewErrors, ThrowOnError, "data"> {
+    const params = buildClientParams([parameters], [{ args: [{ in: "body", key: "activity" }] }]);
+    return (options?.client ?? client).post<
+      RecordActivityViewResponses,
+      RecordActivityViewErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/member/recent-activities",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    });
+  }
+
+  /**
    * Report usage on an activity; the progress service decides completion
    *
    * For a member who can open the course, through a grant or `courses:read` on it. Reports facts, never a decision: the service decides whether the activity is complete. 404 when the activity is not published, or you cannot open its course.
@@ -9362,6 +9748,74 @@ export class Progress {
       url: "/api/member/courses/{courseId}/progress",
       ...options,
       ...params,
+    });
+  }
+
+  /**
+   * List your saved lessons in a course
+   *
+   * Returns published activities only when the member can open the course.
+   */
+  public static listSavedActivities<ThrowOnError extends boolean = false>(
+    parameters: {
+      courseId: string;
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<ListSavedActivitiesResponses, ListSavedActivitiesErrors, ThrowOnError, "data"> {
+    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "courseId" }] }]);
+    return (options?.client ?? client).get<
+      ListSavedActivitiesResponses,
+      ListSavedActivitiesErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/member/courses/{courseId}/saved-activities",
+      ...options,
+      ...params,
+    });
+  }
+
+  /**
+   * Save or remove a lesson from your list
+   *
+   * Requires access to the course and a published activity in that course.
+   */
+  public static setSavedActivity<ThrowOnError extends boolean = false>(
+    parameters: {
+      courseId: string;
+      activity: string;
+      saved: boolean;
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<SetSavedActivityResponses, SetSavedActivityErrors, ThrowOnError, "data"> {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "courseId" },
+            { in: "body", key: "activity" },
+            { in: "body", key: "saved" },
+          ],
+        },
+      ],
+    );
+    return (options?.client ?? client).put<
+      SetSavedActivityResponses,
+      SetSavedActivityErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/member/courses/{courseId}/saved-activities",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     });
   }
 }

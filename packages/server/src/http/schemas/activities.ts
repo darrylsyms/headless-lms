@@ -47,7 +47,7 @@ export type ActivityPathParam = z.infer<typeof ActivityPathParam>;
 export const CreateModule = z.object({ title: z.string().min(1) });
 export type CreateModule = z.infer<typeof CreateModule>;
 
-export const UpdateModule = z.object({ title: z.string().min(1) });
+export const UpdateModule = z.object({ title: z.string().min(1), description: z.string().max(1000).nullable().optional() });
 export type UpdateModule = z.infer<typeof UpdateModule>;
 
 export const ReorderInput = z.object({

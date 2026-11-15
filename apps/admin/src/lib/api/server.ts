@@ -276,7 +276,7 @@ export const serverApi = {
     )[]
   > {
     const headers = await authHeaders();
-    const [coursesPage, downloadsPage, communitiesPage, eventsPage, bundlesPage] =
+    const [coursesPage, downloadsPage, communitiesPage, eventsPage, bundlesPage, insiderFeed] =
       await Promise.all([
         Content.listCourses({ pageSize: 100, sort: "title" }, headers),
         Content.listDownloads({ pageSize: 100, sort: "title" }, headers),
@@ -285,12 +285,19 @@ export const serverApi = {
           ? Events.listEvents({ pageSize: 100, sort: "title" }, headers)
           : Promise.resolve({ rows: [] as { id: string; title: string }[] }),
         Content.listBundles({ pageSize: 100, sort: "name" }, headers),
+        permissions.anywhere("courses:read")
+          ? Content.getInsiderFeed(headers).catch((error: unknown) => {
+              if (error instanceof ApiError && error.status === 403) return null;
+              throw error;
+            })
+          : Promise.resolve(null),
       ]);
     const bundleItems = await Promise.all(
       bundlesPage.rows.map((b) => Content.listBundleItems({ bundleId: b.id }, headers)),
     );
     const titleById = new Map([
       ...coursesPage.rows.map((c) => [c.id, c.title] as const),
+      ...(insiderFeed ? [[insiderFeed.courseId, "Insider Feed"] as const] : []),
       ...downloadsPage.rows.map((d) => [d.id, d.title] as const),
       ...communitiesPage.rows.map((c) => [c.id, c.title] as const),
       ...eventsPage.rows.map((e) => [e.id, e.title] as const),
@@ -307,6 +314,10 @@ export const serverApi = {
     const courses = coursesPage.rows
       .map((c) => ({ id: c.id, title: c.title, type: "course" as const }))
       .sort(byTitle);
+    if (insiderFeed && !courses.some((course) => course.id === insiderFeed.courseId)) {
+      courses.push({ id: insiderFeed.courseId, title: "Insider Feed", type: "course" });
+      courses.sort(byTitle);
+    }
     const downloads = downloadsPage.rows
       .map((d) => ({ id: d.id, title: d.title, type: "download" as const }))
       .sort(byTitle);

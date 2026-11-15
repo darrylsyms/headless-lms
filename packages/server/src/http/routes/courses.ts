@@ -22,6 +22,77 @@ export async function coursesRoutes(app: FastifyInstance, container: Container):
   const r = app.withTypeProvider<ZodTypeProvider>();
   const courses = container.content;
 
+  const feed = z.object({ courseId: z.string(), moduleId: z.string() });
+  r.route({
+    method: 'GET', url: '/api/insider-feed', preHandler: app.requireOrgSession,
+    schema: { operationId: 'getInsiderFeed', tags: ['Content'], response: { 200: feed.nullable(), ...refusals(403) } },
+    handler: async (req) => courses.getInsiderFeed(await resolveActor(container, req)),
+  });
+  r.route({
+    method: 'POST', url: '/api/insider-feed', preHandler: app.requireOrgSession,
+    schema: { operationId: 'ensureInsiderFeed', tags: ['Content'], response: { 200: feed, ...refusals(403) } },
+    handler: async (req) => courses.ensureInsiderFeed(await resolveActor(container, req)),
+  });
+
+  r.route({
+    method: 'GET', url: '/api/insider-categories', preHandler: app.requireOrgSession,
+    schema: { operationId: 'listInsiderCategories', tags: ['Content'], response: { 200: z.array(z.string()), ...refusals(403) } },
+    handler: async (req) => container.insiderCategories.list(await resolveActor(container, req)),
+  });
+  r.route({
+    method: 'POST', url: '/api/insider-categories', preHandler: app.requireOrgSession,
+    schema: { operationId: 'changeInsiderCategory', tags: ['Content'], body: z.object({ name: z.string().trim().min(1).max(100), previous: z.string().optional() }), response: { 200: z.array(z.string()), ...refusals(403, 404, 409, 422) } },
+    handler: async (req) => container.insiderCategories.change(req.body.name, req.body.previous, await resolveActor(container, req)),
+  });
+  r.route({
+    method: 'DELETE', url: '/api/insider-categories', preHandler: app.requireOrgSession,
+    schema: { operationId: 'deleteInsiderCategory', tags: ['Content'], body: z.object({ name: z.string().min(1).max(100) }), response: { 200: z.array(z.string()), ...refusals(403, 404) } },
+    handler: async (req) => container.insiderCategories.delete(req.body.name, await resolveActor(container, req)),
+  });
+
+  r.route({
+    method: 'GET',
+    url: '/api/course-categories',
+    preHandler: app.requireOrgSession,
+    schema: {
+      operationId: 'listCourseCategories',
+      tags: ['Content'],
+      response: { 200: z.array(z.string()), ...refusals(403) },
+    },
+    handler: async (req) => container.courseCategories.list(await resolveActor(container, req)),
+  });
+  r.route({
+    method: 'POST',
+    url: '/api/course-categories',
+    preHandler: app.requireOrgSession,
+    schema: {
+      operationId: 'changeCourseCategory',
+      tags: ['Content'],
+      body: z.object({ name: z.string().trim().min(1).max(100), previous: z.string().optional() }),
+      response: { 200: z.array(z.string()), ...refusals(403, 404, 409, 422) },
+    },
+    handler: async (req) =>
+      container.courseCategories.change(
+        req.body.name,
+        req.body.previous,
+        await resolveActor(container, req),
+      ),
+  });
+
+  r.route({
+    method: 'DELETE',
+    url: '/api/course-categories',
+    preHandler: app.requireOrgSession,
+    schema: {
+      operationId: 'deleteCourseCategory',
+      tags: ['Content'],
+      body: z.object({ name: z.string().min(1).max(100) }),
+      response: { 200: z.array(z.string()), ...refusals(403, 404) },
+    },
+    handler: async (req) =>
+      container.courseCategories.delete(req.body.name, await resolveActor(container, req)),
+  });
+
   r.route({
     method: 'GET',
     url: '/api/courses',

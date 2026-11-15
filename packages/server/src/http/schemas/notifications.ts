@@ -97,7 +97,7 @@ const notificationFilterShape = z
 
 export const NotificationFilterQuery = notificationFilterShape.superRefine(scopeMatchesCommunity);
 
-export const NotificationListQuery = PageQuery.extend(notificationFilterShape.shape)
+export const NotificationListQuery = PageQuery.extend({ ...notificationFilterShape.shape, courseId: z.string().min(1).max(64).optional().describe('Only visible lesson comments in this accessible course'), notificationId: z.string().min(1).max(64).optional().describe('Only this notification') })
   .strict()
   .superRefine(scopeMatchesCommunity);
 

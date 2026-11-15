@@ -14,14 +14,28 @@ export interface ProgressService {
    *  emit events. Returns the activity's record after the decision. The actor
    *  reports on themselves. */
   report(input: ReportProgressInput, actor: Actor): Promise<ProgressRecord>;
+  recordView(activityId: string, actor: Actor): Promise<void>;
+  listRecentViews(actor: Actor): Promise<RecentActivityView[]>;
+  listAllSaved(actor: Actor): Promise<SavedActivityView[]>;
+  removeSaved(activityId: string, actor: Actor): Promise<void>;
+  listSaved(courseId: string, actor: Actor): Promise<string[]>;
+  setSaved(courseId: string, activityId: string, saved: boolean, actor: Actor): Promise<void>;
   /** Fetch the record for a single (student, target), or null. */
   get(orgId: string, target: ProgressTarget): Promise<ProgressRecord | null>;
   /** Records for a set of target ids — the read the reporting layer composes. */
   listByTargets(orgId: string, orgUserId: string, targetIds: string[]): Promise<ProgressRecord[]>;
 }
 
+export type SavedActivityView = { activityId: string; courseId: string; title: string; kind: 'lesson' | 'song' | 'insider'; thumbnailUrl: string | null; accessible: boolean };
+export type RecentActivityView = { activityId: string; courseId: string; title: string; kind: 'lesson' | 'song' | 'insider'; thumbnailUrl: string | null; viewedAt: string; accessible: boolean };
+
 // Outbound port (persistence contract the repository fulfils).
 export interface ProgressRepository {
+  recordView(orgId: string, orgUserId: string, activityId: string): Promise<void>;
+  listRecentViews(orgId: string, orgUserId: string): Promise<{ activityId: string; viewedAt: Date }[]>;
+  listSavedIds(orgId: string, orgUserId: string): Promise<string[]>;
+  savedAmong(orgId: string, orgUserId: string, activityIds: string[]): Promise<string[]>;
+  setSaved(orgId: string, orgUserId: string, activityId: string, saved: boolean): Promise<void>;
   /** Conflict-safe insert. null = lost a concurrent-insert race (unique key already taken). */
   insert(orgId: string, record: ProgressRecord): Promise<ProgressRecord | null>;
   /** Scoped to the org — returns the record for the unique (student, target) key, or null. */
@@ -49,7 +63,7 @@ export interface ContentAccessReader {
 
 export type CourseReader = Pick<
   CourseManagementService,
-  'getActivity' | 'findCourse' | 'listCourseModules' | 'listCourseActivities'
+  'getInsiderFeed' | 'getActivity' | 'findCourse' | 'listCourseModules' | 'listCourseActivities'
 >;
 
 export interface SystemActors {

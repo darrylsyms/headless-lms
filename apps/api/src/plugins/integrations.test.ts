@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "node:url";
-import { loadIntegrations } from "@headless-lms/server";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import slack from "./slack/index.js";
 
 // Per-integration behaviour is tested where the integration lives (the slack
@@ -32,8 +33,24 @@ describe("integrations directory contract", () => {
 
 describe("loadIntegrations over the real plugins directory", () => {
   it("discovers exactly the slack integration", async () => {
-    const registry = await loadIntegrations(fileURLToPath(new URL("./", import.meta.url)));
-    expect(registry.list().map((i) => i.id)).toEqual(["slack"]);
+    const script =
+      "const { loadIntegrations } = await import(process.argv[1]); const registry = await loadIntegrations(process.argv[2]); console.log(JSON.stringify(registry.list().map((item) => item.id)));";
+    const loader = new URL("../../../../packages/server/src/app/integrations.ts", import.meta.url)
+      .href;
+    const { stdout } = await promisify(execFile)(
+      process.execPath,
+      [
+        "--import",
+        "tsx",
+        "--input-type=module",
+        "-e",
+        script,
+        loader,
+        fileURLToPath(new URL("./", import.meta.url)),
+      ],
+      { cwd: fileURLToPath(new URL("../../", import.meta.url)) },
+    );
+    expect(JSON.parse(stdout.trim())).toEqual(["slack"]);
   });
 });
 

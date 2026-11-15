@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "ba_account_provider_account_uidx" ON "ba_account" USING btree ("provider_id","account_id");

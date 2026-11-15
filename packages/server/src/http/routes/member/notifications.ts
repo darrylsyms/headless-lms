@@ -35,9 +35,9 @@ export async function memberNotificationRoutes(
       tags,
       summary: 'List your notifications, newest first, with the unread count of the same filters',
       description:
-        'For any member of the organization. Filters combine with AND; the values of one filter combine with OR, and `includeOrg=true` with `communityId` adds the org list, so one query reads a community with the course and account notifications. 400 for `includeOrg` without `communityId` or with `scope`. Each notification carries the current titles, names and excerpts of what it refers to; a subject or parent you can no longer open, or that was deleted, is null. `display` is the text stored when it was sent.',
+        'For any member of the organization. Filters combine with AND; the values of one filter combine with OR, and `includeOrg=true` with `communityId` adds the org list, so one query reads a community with the course and account notifications. 400 for `includeOrg` without `communityId` or with `scope`. A course filter requires access and returns only published lesson comments. Each notification carries the current titles, names and excerpts of what it refers to; a subject or parent you can no longer open, or that was deleted, is null. `display` is the text stored when it was sent.',
       querystring: NotificationListQuery,
-      response: { 200: NotificationsPage, ...refusals(400, 403) },
+      response: { 200: NotificationsPage, ...refusals(400, 403, 404) },
     },
     handler: async (req) => {
       const { page, pageSize, ...filter } = req.query;

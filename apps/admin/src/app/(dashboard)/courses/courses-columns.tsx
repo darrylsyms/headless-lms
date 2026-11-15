@@ -50,7 +50,9 @@ export function coursesColumns(opts: {
     {
       accessorKey: "category",
       header: ({ column }) => <ColumnHeader column={column} title="Category" />,
-      cell: ({ row }) => <span className="text-ink-2">{row.original.category}</span>,
+      cell: ({ row }) => (
+        <span className="text-ink-2">{row.original.category || "Uncategorised"}</span>
+      ),
     },
     {
       accessorKey: "status",

@@ -178,6 +178,53 @@ describe("community access", () => {
 });
 
 describe("transitions", () => {
+  it("inserts integration grants only if no grant already exists", async () => {
+    const { repo, queries } = capturingDb([]);
+    await expect(
+      repo.insertIntegrationGrant("org-1", {
+        orgUserId: "ou_1",
+        contentId: "crs_1",
+        source: "integration:woocommerce",
+      }),
+    ).resolves.toBeNull();
+    expect(queries[0]!.text).toContain("on conflict do nothing");
+    expect(queries[0]!.values).toContain("integration:woocommerce");
+    await expect(
+      repo.insertIntegrationGrant("org-1", {
+        orgUserId: "ou_1",
+        contentId: "crs_1",
+        source: "manual",
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("only transitions the expected integration-owned version", async () => {
+    const { repo, queries } = capturingDb([]);
+    await expect(
+      repo.transitionIntegrationGrant("org-1", {
+        id: "ent_1",
+        source: "integration:woocommerce",
+        expectedStatus: "active",
+        expectedUpdatedAt: now,
+        status: "revoked",
+      }),
+    ).resolves.toBeNull();
+    const query = queries[0]!;
+    expect(query.text).toContain('"entitlements"."source" =');
+    expect(query.text).toContain('"entitlements"."status" =');
+    expect(query.text).toContain('"entitlements"."updated_at" =');
+    expect(query.values).toContain("integration:woocommerce");
+    await expect(
+      repo.transitionIntegrationGrant("org-1", {
+        id: "ent_1",
+        source: "manual",
+        expectedStatus: "active",
+        expectedUpdatedAt: now,
+        status: "revoked",
+      }),
+    ).rejects.toThrow();
+  });
+
   it("locks a space member row for update", async () => {
     const { repo, queries } = capturingDb([]);
     await repo.lockSpaceMember("org-1", "spc_1", "ou_1");

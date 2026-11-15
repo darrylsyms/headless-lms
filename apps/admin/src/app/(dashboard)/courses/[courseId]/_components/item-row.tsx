@@ -4,13 +4,14 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Eye, EyeOff, FileText, GripVertical, SlidersHorizontal, Trash2 } from "lucide-react";
+import { Eye, EyeOff, FileText, Film, GripVertical, SlidersHorizontal, Trash2 } from "lucide-react";
 
 import { toast } from "sonner";
 
 import { RowActions } from "@/components/data-table/row-actions";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { containsVideoBlock } from "@/lib/activity-video";
 import { activityPublished } from "@/lib/api/compose";
 import type { Activity, ActivitySettings } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
@@ -22,10 +23,12 @@ function settingsOf(activity: Activity): ActivitySettings {
   return (activity.settings ?? {}) as ActivitySettings;
 }
 
-function ActivityIcon() {
+export function ActivityIcon({ content }: { content: ActivitySettings["content"] }) {
+  const video = containsVideoBlock(content?.config);
+  const Icon = video ? Film : FileText;
   return (
-    <span className="grid size-7 shrink-0 place-items-center rounded-md bg-surface-2 text-ink-3">
-      <FileText className="size-4" />
+    <span role="img" aria-label={video ? "Video activity" : "Written activity"} className="grid size-7 shrink-0 place-items-center rounded-md bg-surface-2 text-ink-3">
+      <Icon aria-hidden="true" className="size-4" />
     </span>
   );
 }
@@ -109,7 +112,7 @@ export function ItemRow({
         <span className="w-7 shrink-0" aria-hidden />
       )}
 
-      <ActivityIcon />
+      <ActivityIcon content={settings.content} />
 
       {canEdit ? (
         <Link
