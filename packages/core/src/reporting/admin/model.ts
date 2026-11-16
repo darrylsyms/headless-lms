@@ -64,6 +64,10 @@ export interface CourseEnrollmentPoint {
 }
 
 export interface Student extends OrgUserProfile {
+  wooCustomerId?: number | null;
+  wooSubscribed?: boolean | null;
+  wooSyncIssues?: string[];
+  wooSyncHealth?: 'ok' | 'error' | 'unknown';
   /** As typed on the invite form. `name` is the composed rendering name and
    *  drifts once the person edits their own profile; these are what the admin
    *  edits. Null for anyone who arrived by self-signup. */

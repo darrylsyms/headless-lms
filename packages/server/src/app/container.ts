@@ -8,6 +8,7 @@ import {
   DrizzleConnectionsRepository,
   DrizzleContentRepository,
   DrizzleCourseCategoriesRepository,
+  ProductCourseMappingsRepository,
   DrizzleInsiderCategoriesRepository,
   DrizzleCredentialStore,
   DrizzleAdminRepository,
@@ -61,6 +62,7 @@ import {
 } from '@headless-lms/core/content';
 import {
   EntitlementsServiceImpl,
+  ProductCourseMappingService,
   entitlementsJobs,
   entitlementsRecurringJobs,
 } from '@headless-lms/core/entitlements';
@@ -257,6 +259,7 @@ export interface Container {
   organizations: OrganizationServiceImpl;
   content: ContentService;
   courseCategories: CourseCategories;
+  productCourseMappings: ProductCourseMappingService;
   insiderCategories: CourseCategories;
   entitlements: EntitlementsServiceImpl;
   progress: ProgressServiceImpl;
@@ -967,6 +970,7 @@ export async function buildContainer(
     orgProvider: auth,
     content,
     courseCategories: new CourseCategories(new DrizzleCourseCategoriesRepository(db)),
+    productCourseMappings: new ProductCourseMappingService(new ProductCourseMappingsRepository(db)),
     insiderCategories: new CourseCategories(new DrizzleInsiderCategoriesRepository(db)),
     entitlements,
     progress,

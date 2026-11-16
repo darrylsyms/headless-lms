@@ -2382,6 +2382,155 @@ export type GetDefaultNotificationCategoriesResponses = {
 export type GetDefaultNotificationCategoriesResponse =
   GetDefaultNotificationCategoriesResponses[keyof GetDefaultNotificationCategoriesResponses];
 
+export type GetCourseProductMappingData = {
+  body?: never;
+  path: {
+    courseId: string;
+  };
+  query?: never;
+  url: "/api/courses/{courseId}/product-mapping";
+};
+
+export type GetCourseProductMappingErrors = {
+  /**
+   * Default Response
+   */
+  400: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    issues?: Array<{
+      /**
+       * Where in the request, such as `body.topics[1].name`
+       */
+      path: string;
+      message: string;
+    }>;
+  };
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  404: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type GetCourseProductMappingError =
+  GetCourseProductMappingErrors[keyof GetCourseProductMappingErrors];
+
+export type GetCourseProductMappingResponses = {
+  /**
+   * Default Response
+   */
+  200: {
+    courseId: string;
+    productIds: Array<number>;
+  } | null;
+};
+
+export type GetCourseProductMappingResponse =
+  GetCourseProductMappingResponses[keyof GetCourseProductMappingResponses];
+
+export type ReplaceCourseProductMappingData = {
+  body: {
+    productIds: Array<number>;
+  };
+  path: {
+    courseId: string;
+  };
+  query?: never;
+  url: "/api/courses/{courseId}/product-mapping";
+};
+
+export type ReplaceCourseProductMappingErrors = {
+  /**
+   * Default Response
+   */
+  400: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    issues?: Array<{
+      /**
+       * Where in the request, such as `body.topics[1].name`
+       */
+      path: string;
+      message: string;
+    }>;
+  };
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  404: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type ReplaceCourseProductMappingError =
+  ReplaceCourseProductMappingErrors[keyof ReplaceCourseProductMappingErrors];
+
+export type ReplaceCourseProductMappingResponses = {
+  /**
+   * Default Response
+   */
+  204: null;
+};
+
+export type ReplaceCourseProductMappingResponse =
+  ReplaceCourseProductMappingResponses[keyof ReplaceCourseProductMappingResponses];
+
 export type GetInsiderFeedData = {
   body?: never;
   path?: never;
@@ -26815,6 +26964,10 @@ export type ListStudentsResponses = {
       lastName: string | null;
       email: string;
       image: string | null;
+      wooCustomerId?: number | null;
+      wooSubscribed?: boolean | null;
+      wooSyncIssues?: Array<string>;
+      wooSyncHealth?: "ok" | "error" | "unknown";
       entitlementCount: number;
       avgProgress: number;
       status: "invited" | "active";
@@ -26909,6 +27062,10 @@ export type GetStudentResponses = {
     lastName: string | null;
     email: string;
     image: string | null;
+    wooCustomerId?: number | null;
+    wooSubscribed?: boolean | null;
+    wooSyncIssues?: Array<string>;
+    wooSyncHealth?: "ok" | "error" | "unknown";
     entitlementCount: number;
     avgProgress: number;
     status: "invited" | "active";

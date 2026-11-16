@@ -46,3 +46,40 @@ export async function setSongLibraryAction(courseId: string, songLibrary: boolea
   revalidatePath("/courses");
   return settings;
 }
+
+export async function setCourseProductMappingAction(courseId: string, productIds: number[]): Promise<void> {
+  const { Integrations } = await import("@headless-lms/sdk");
+  await Integrations.replaceCourseProductMapping({ courseId, productIds }, await authHeaders());
+  revalidatePath("/courses/[courseId]/settings", "page");
+}
+
+export async function searchStagingProductsAction(query: string): Promise<{ id: number; name: string }[]> {
+  const { requirePermission } = await import("@/lib/auth/server-permissions");
+  await requirePermission("integrations:read");
+  if (process.env.NODE_ENV === "production" || process.env.FRETWISE_STAGING_PRODUCT_PICKER !== "1") throw new Error("The staging product picker is not enabled.");
+  if (query.length > 100) throw new Error("Search is too long.");
+  const url = new URL("https://getfretwise-cydd.1wp.site/wp-json/wc/store/v1/products");
+  url.searchParams.set("per_page", "100");
+  if (query.trim()) url.searchParams.set("search", query.trim());
+  const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(10000), redirect: "error" });
+  if (!response.ok) throw new Error("Could not load staging products.");
+  const data: unknown = await response.json();
+  if (!Array.isArray(data) || data.some((item) => !item || !Number.isSafeInteger(item.id) || item.id <= 0 || typeof item.name !== "string")) throw new Error("Unexpected product response.");
+  return data.map((item) => ({ id: item.id, name: item.name }));
+}
+
+export async function lookupStagingProductsAction(ids: number[]): Promise<{ id: number; name: string }[]> {
+  const { requirePermission } = await import("@/lib/auth/server-permissions");
+  await requirePermission("integrations:read");
+  if (process.env.NODE_ENV === "production" || process.env.FRETWISE_STAGING_PRODUCT_PICKER !== "1") throw new Error("The staging product picker is not enabled.");
+  if (ids.length === 0) return [];
+  if (ids.length > 100 || ids.some((id) => !Number.isSafeInteger(id) || id <= 0 || id > 2147483647)) throw new Error("Invalid product IDs.");
+  const url = new URL("https://getfretwise-cydd.1wp.site/wp-json/wc/store/v1/products");
+  url.searchParams.set("per_page", "100");
+  url.searchParams.set("include", ids.join(","));
+  const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(10000), redirect: "error" });
+  if (!response.ok) throw new Error("Could not load staging products.");
+  const data: unknown = await response.json();
+  if (!Array.isArray(data) || data.some((item) => !item || !Number.isSafeInteger(item.id) || typeof item.name !== "string")) throw new Error("Unexpected product response.");
+  return data.map((item) => ({ id: item.id, name: item.name }));
+}

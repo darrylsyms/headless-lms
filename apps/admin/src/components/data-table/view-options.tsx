@@ -43,7 +43,7 @@ export function ViewOptions<TData>({ table }: { table: Table<TData> }) {
             onCheckedChange={(value) => column.toggleVisibility(!!value)}
             onSelect={(e) => e.preventDefault()}
           >
-            <span className="capitalize">{columnLabel(column.id)}</span>
+            <span className="capitalize">{column.columnDef.meta?.label ?? columnLabel(column.id)}</span>
           </DropdownMenuCheckboxItem>
         ))}
       </DropdownMenuContent>

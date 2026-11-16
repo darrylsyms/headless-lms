@@ -520,12 +520,10 @@ export class DrizzleAdminRepository implements AdminReportRepository {
       .limit(query.pageSize)
       .offset((query.page - 1) * query.pageSize);
 
-    const items = await this.itemsOf(
-      orgId,
-      rows.map((row) => row.id),
-    );
+    const ids = rows.map((row) => row.id);
+    const [items, commerce] = await Promise.all([this.itemsOf(orgId, ids), this.stagingCommerceOf(orgId, ids)]);
     return {
-      rows: rows.map((row) => toStudent(row, items.get(row.id) ?? [])),
+      rows: rows.map((row) => ({ ...toStudent(row, items.get(row.id) ?? []), ...(commerce.get(row.id) ?? { wooCustomerId: null, wooSubscribed: null }) })),
       total: Number(totals?.total ?? 0),
       page: query.page,
       pageSize: query.pageSize,
@@ -565,8 +563,38 @@ export class DrizzleAdminRepository implements AdminReportRepository {
     if (!row) {
       return null;
     }
-    const items = await this.itemsOf(orgId, [row.id]);
-    return toStudent(row, items.get(row.id) ?? []);
+    const [items, commerce] = await Promise.all([this.itemsOf(orgId, [row.id]), this.stagingCommerceOf(orgId, [row.id])]);
+    return { ...toStudent(row, items.get(row.id) ?? []), ...(commerce.get(row.id) ?? { wooCustomerId: null, wooSubscribed: null }) };
+  }
+
+  private async stagingCommerceOf(orgId: string, ids: string[]): Promise<Map<string, { wooCustomerId: number | null; wooSubscribed: boolean | null; wooSyncIssues: string[]; wooSyncHealth: "ok" | "error" | "unknown" }>> {
+    if (!ids.length) {return new Map();}
+    const result = await this.db.execute(sql`
+      select ou.id as org_user_id, case when a.id is not null then c.customer_id else null end as customer_id,
+        array(select f.target from purchase_sync_failures f where f.org_id=ou.org_id and f.org_user_id=ou.id order by f.target) as sync_issues,
+        coalesce((select case when h.checked_at < now() - interval '5 minutes' then 'unknown' else h.state end from purchase_sync_health h where h.org_id=ou.org_id and h.integration_id='woocommerce-local-test'), 'unknown') as sync_health,
+        case
+          when a.id is null then null
+          when l.state is null or coalesce(l.state->>'capturedAt', '') !~ '^[0-9]{1,16}$' then null
+          when (l.state->>'capturedAt')::numeric < extract(epoch from now() - interval '5 minutes') * 1000
+            or (l.state->>'capturedAt')::numeric > extract(epoch from now()) * 1000 then null
+          when e.id is not null and e.source = 'integration:woocommerce-local-test'
+            and e.id = l.state->'managed'->'subscription'->>'id'
+            and e.xmin::text = l.state->'managed'->'subscription'->>'version'
+            and (e.expires_at is null or e.expires_at > now()) then e.status = 'active'
+          when e.id is null and l.state->'known'->'subscription' = '[]'::jsonb then false
+          else null
+        end as subscribed
+      from org_users ou
+      join users u on u.id=ou.user_id
+      left join purchase_sync_customers c on c.org_id=ou.org_id and c.org_user_id=ou.id
+      left join ba_account a on a.user_id=u.external_id and a.account_id=c.customer_id::text and a.provider_id='fretwise-wordpress-staging'
+      left join purchase_sync_mappings m on m.org_id=c.org_id and m.org_user_id=c.org_user_id and m.integration_id='woocommerce-local-test' and m.manages_subscription
+      left join purchase_sync_ledgers l on l.org_id=m.org_id and l.org_user_id=m.org_user_id and l.integration_id=m.integration_id
+      left join entitlements e on e.org_id=m.org_id and e.org_user_id=m.org_user_id and e.bundle_id=m.bundle_id
+      where ou.org_id=${orgId} and ou.id in (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})
+    `);
+    return new Map(result.rows.map((row) => [String(row.org_user_id), { wooCustomerId: row.customer_id === null ? null : Number(row.customer_id), wooSubscribed: typeof row.subscribed === "boolean" ? row.subscribed : null, wooSyncIssues: Array.isArray(row.sync_issues) ? row.sync_issues.map(String) : [], wooSyncHealth: row.sync_health === "ok" || row.sync_health === "error" ? row.sync_health : "unknown" }]));
   }
 
   private async itemsOf(orgId: string, orgUserIds: string[]): Promise<Map<string, StudentItem[]>> {

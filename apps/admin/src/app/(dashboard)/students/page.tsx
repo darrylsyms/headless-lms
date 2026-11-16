@@ -22,5 +22,6 @@ export default async function StudentsPage({
     serverApi.contentTitles(permissions),
   ]);
 
-  return <StudentsTable rows={rows} total={total} params={params} roles={roles} titles={titles} />;
+  const commerceOrigin = process.env.NODE_ENV === "production" ? undefined : "https://getfretwise-cydd.1wp.site";
+  return <StudentsTable rows={rows} total={total} params={params} roles={roles} titles={titles} commerceOrigin={commerceOrigin} />;
 }

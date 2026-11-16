@@ -46,3 +46,5 @@ export type {
   SpaceMemberDeleted,
   EntitlementEvent,
 } from './events.js';
+export { ProductCourseMappingService } from './product-course-mapping.js';
+export type { ProductCourseMapping, ProductCourseMappingStore } from './product-course-mapping.js';

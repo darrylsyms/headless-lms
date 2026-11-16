@@ -232,6 +232,34 @@
       "when": 1794755109905,
       "tag": "0032_curly_cammi",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1794782459572,
+      "tag": "0033_sweet_talkback",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1794825050107,
+      "tag": "0034_premium_sleeper",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1794827272589,
+      "tag": "0035_rainy_veda",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794838803854,
+      "tag": "0036_overconfident_sinister_six",
+      "breakpoints": true
     }
   ]
 }

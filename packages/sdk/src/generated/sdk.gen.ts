@@ -202,6 +202,8 @@ import type {
   GetCourseEnrollmentSeriesErrors,
   GetCourseEnrollmentSeriesResponses,
   GetCourseErrors,
+  GetCourseProductMappingErrors,
+  GetCourseProductMappingResponses,
   GetCourseResponses,
   GetCourseThumbnailErrors,
   GetDefaultNotificationCategoriesErrors,
@@ -514,6 +516,8 @@ import type {
   ReorderSpacesResponses,
   ReplaceCommunityNotificationCategoriesErrors,
   ReplaceCommunityNotificationCategoriesResponses,
+  ReplaceCourseProductMappingErrors,
+  ReplaceCourseProductMappingResponses,
   ReplaceOrgNotificationCategoriesErrors,
   ReplaceOrgNotificationCategoriesResponses,
   ReplyToCommentErrors,
@@ -2340,6 +2344,364 @@ export class Notifications {
       responseStyle: "data",
       url: "/api/member/push-config",
       ...options,
+    });
+  }
+}
+
+export class Integrations {
+  public static getCourseProductMapping<ThrowOnError extends boolean = false>(
+    parameters: {
+      courseId: string;
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<
+    GetCourseProductMappingResponses,
+    GetCourseProductMappingErrors,
+    ThrowOnError,
+    "data"
+  > {
+    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "courseId" }] }]);
+    return (options?.client ?? client).get<
+      GetCourseProductMappingResponses,
+      GetCourseProductMappingErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/courses/{courseId}/product-mapping",
+      ...options,
+      ...params,
+    });
+  }
+
+  public static replaceCourseProductMapping<ThrowOnError extends boolean = false>(
+    parameters: {
+      courseId: string;
+      productIds: Array<number>;
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<
+    ReplaceCourseProductMappingResponses,
+    ReplaceCourseProductMappingErrors,
+    ThrowOnError,
+    "data"
+  > {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "courseId" },
+            { in: "body", key: "productIds" },
+          ],
+        },
+      ],
+    );
+    return (options?.client ?? client).put<
+      ReplaceCourseProductMappingResponses,
+      ReplaceCourseProductMappingErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/courses/{courseId}/product-mapping",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    });
+  }
+
+  /**
+   * List the integrations this deployment supports
+   *
+   * Requires `integrations:read`. Each with the JSON Schemas of its config, its secrets and its actions.
+   */
+  public static listAvailableIntegrations<ThrowOnError extends boolean = false>(
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<
+    ListAvailableIntegrationsResponses,
+    ListAvailableIntegrationsErrors,
+    ThrowOnError,
+    "data"
+  > {
+    return (options?.client ?? client).get<
+      ListAvailableIntegrationsResponses,
+      ListAvailableIntegrationsErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/integrations/available",
+      ...options,
+    });
+  }
+
+  /**
+   * List the organization's integration connections
+   *
+   * Requires `integrations:read`. Secrets are never returned.
+   */
+  public static listConnections<ThrowOnError extends boolean = false>(
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<ListConnectionsResponses, ListConnectionsErrors, ThrowOnError, "data"> {
+    return (options?.client ?? client).get<
+      ListConnectionsResponses,
+      ListConnectionsErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/integrations",
+      ...options,
+    });
+  }
+
+  /**
+   * Connect an integration
+   *
+   * Requires `integrations:write`. Stores the secrets encrypted; they are never returned. 400 when the integration is unknown or the config is invalid; 409 when the organization already has a connection to it.
+   */
+  public static connectIntegration<ThrowOnError extends boolean = false>(
+    parameters: {
+      integrationId: string;
+      secrets: {
+        [key: string]: JsonValueInput;
+      };
+      config?: {
+        [key: string]: JsonValueInput;
+      };
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<ConnectIntegrationResponses, ConnectIntegrationErrors, ThrowOnError, "data"> {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "body", key: "integrationId" },
+            { in: "body", key: "secrets" },
+            { in: "body", key: "config" },
+          ],
+        },
+      ],
+    );
+    return (options?.client ?? client).post<
+      ConnectIntegrationResponses,
+      ConnectIntegrationErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/integrations",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    });
+  }
+
+  /**
+   * Disconnect an integration
+   *
+   * Requires `integrations:delete`. Destroys its stored secrets.
+   */
+  public static disconnectIntegration<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string;
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<
+    DisconnectIntegrationResponses,
+    DisconnectIntegrationErrors,
+    ThrowOnError,
+    "data"
+  > {
+    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "id" }] }]);
+    return (options?.client ?? client).delete<
+      DisconnectIntegrationResponses,
+      DisconnectIntegrationErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/integrations/{id}",
+      ...options,
+      ...params,
+    });
+  }
+
+  /**
+   * Get a connection
+   *
+   * Requires `integrations:read`. Secrets are never returned.
+   */
+  public static getConnection<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string;
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<GetConnectionResponses, GetConnectionErrors, ThrowOnError, "data"> {
+    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "id" }] }]);
+    return (options?.client ?? client).get<
+      GetConnectionResponses,
+      GetConnectionErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/integrations/{id}",
+      ...options,
+      ...params,
+    });
+  }
+
+  /**
+   * Change a connection's configuration or active flag
+   *
+   * Requires `integrations:write`. 400 when the config is invalid for the integration.
+   */
+  public static configureConnection<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string;
+      config?: {
+        [key: string]: JsonValueInput;
+      };
+      active?: boolean;
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<ConfigureConnectionResponses, ConfigureConnectionErrors, ThrowOnError, "data"> {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "id" },
+            { in: "body", key: "config" },
+            { in: "body", key: "active" },
+          ],
+        },
+      ],
+    );
+    return (options?.client ?? client).patch<
+      ConfigureConnectionResponses,
+      ConfigureConnectionErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/integrations/{id}",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    });
+  }
+
+  /**
+   * Replace a connection's secrets
+   *
+   * Requires `integrations:write`. The new secrets replace the stored ones.
+   */
+  public static reconnectIntegration<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string;
+      secrets: {
+        [key: string]: JsonValueInput;
+      };
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<
+    ReconnectIntegrationResponses,
+    ReconnectIntegrationErrors,
+    ThrowOnError,
+    "data"
+  > {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "id" },
+            { in: "body", key: "secrets" },
+          ],
+        },
+      ],
+    );
+    return (options?.client ?? client).post<
+      ReconnectIntegrationResponses,
+      ReconnectIntegrationErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/integrations/{id}/reconnect",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    });
+  }
+
+  /**
+   * Invoke one of a connection's actions
+   *
+   * Requires `integrations:write`. Runs the action, such as a listing that feeds a picker, with `input` checked against its input schema. 400 when the action fails or rejects the input; 404 when the connection or action does not exist; 409 when the connection is inactive.
+   */
+  public static invokeConnectionAction<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string;
+      actionId: string;
+      input?: {
+        [key: string]: unknown;
+      };
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<
+    InvokeConnectionActionResponses,
+    InvokeConnectionActionErrors,
+    ThrowOnError,
+    "data"
+  > {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "id" },
+            { in: "path", key: "actionId" },
+            { in: "body", key: "input" },
+          ],
+        },
+      ],
+    );
+    return (options?.client ?? client).post<
+      InvokeConnectionActionResponses,
+      InvokeConnectionActionErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/integrations/{id}/actions/{actionId}",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     });
   }
 }
@@ -11855,298 +12217,6 @@ export class Automations {
       url: "/api/automations/webhooks/{id}/secret/rotate",
       ...options,
       ...params,
-    });
-  }
-}
-
-export class Integrations {
-  /**
-   * List the integrations this deployment supports
-   *
-   * Requires `integrations:read`. Each with the JSON Schemas of its config, its secrets and its actions.
-   */
-  public static listAvailableIntegrations<ThrowOnError extends boolean = false>(
-    options?: Options<never, ThrowOnError>,
-  ): RequestResult<
-    ListAvailableIntegrationsResponses,
-    ListAvailableIntegrationsErrors,
-    ThrowOnError,
-    "data"
-  > {
-    return (options?.client ?? client).get<
-      ListAvailableIntegrationsResponses,
-      ListAvailableIntegrationsErrors,
-      ThrowOnError,
-      "data"
-    >({
-      responseStyle: "data",
-      url: "/api/integrations/available",
-      ...options,
-    });
-  }
-
-  /**
-   * List the organization's integration connections
-   *
-   * Requires `integrations:read`. Secrets are never returned.
-   */
-  public static listConnections<ThrowOnError extends boolean = false>(
-    options?: Options<never, ThrowOnError>,
-  ): RequestResult<ListConnectionsResponses, ListConnectionsErrors, ThrowOnError, "data"> {
-    return (options?.client ?? client).get<
-      ListConnectionsResponses,
-      ListConnectionsErrors,
-      ThrowOnError,
-      "data"
-    >({
-      responseStyle: "data",
-      url: "/api/integrations",
-      ...options,
-    });
-  }
-
-  /**
-   * Connect an integration
-   *
-   * Requires `integrations:write`. Stores the secrets encrypted; they are never returned. 400 when the integration is unknown or the config is invalid; 409 when the organization already has a connection to it.
-   */
-  public static connectIntegration<ThrowOnError extends boolean = false>(
-    parameters: {
-      integrationId: string;
-      secrets: {
-        [key: string]: JsonValueInput;
-      };
-      config?: {
-        [key: string]: JsonValueInput;
-      };
-    },
-    options?: Options<never, ThrowOnError>,
-  ): RequestResult<ConnectIntegrationResponses, ConnectIntegrationErrors, ThrowOnError, "data"> {
-    const params = buildClientParams(
-      [parameters],
-      [
-        {
-          args: [
-            { in: "body", key: "integrationId" },
-            { in: "body", key: "secrets" },
-            { in: "body", key: "config" },
-          ],
-        },
-      ],
-    );
-    return (options?.client ?? client).post<
-      ConnectIntegrationResponses,
-      ConnectIntegrationErrors,
-      ThrowOnError,
-      "data"
-    >({
-      responseStyle: "data",
-      url: "/api/integrations",
-      ...options,
-      ...params,
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-        ...params.headers,
-      },
-    });
-  }
-
-  /**
-   * Disconnect an integration
-   *
-   * Requires `integrations:delete`. Destroys its stored secrets.
-   */
-  public static disconnectIntegration<ThrowOnError extends boolean = false>(
-    parameters: {
-      id: string;
-    },
-    options?: Options<never, ThrowOnError>,
-  ): RequestResult<
-    DisconnectIntegrationResponses,
-    DisconnectIntegrationErrors,
-    ThrowOnError,
-    "data"
-  > {
-    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "id" }] }]);
-    return (options?.client ?? client).delete<
-      DisconnectIntegrationResponses,
-      DisconnectIntegrationErrors,
-      ThrowOnError,
-      "data"
-    >({
-      responseStyle: "data",
-      url: "/api/integrations/{id}",
-      ...options,
-      ...params,
-    });
-  }
-
-  /**
-   * Get a connection
-   *
-   * Requires `integrations:read`. Secrets are never returned.
-   */
-  public static getConnection<ThrowOnError extends boolean = false>(
-    parameters: {
-      id: string;
-    },
-    options?: Options<never, ThrowOnError>,
-  ): RequestResult<GetConnectionResponses, GetConnectionErrors, ThrowOnError, "data"> {
-    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "id" }] }]);
-    return (options?.client ?? client).get<
-      GetConnectionResponses,
-      GetConnectionErrors,
-      ThrowOnError,
-      "data"
-    >({
-      responseStyle: "data",
-      url: "/api/integrations/{id}",
-      ...options,
-      ...params,
-    });
-  }
-
-  /**
-   * Change a connection's configuration or active flag
-   *
-   * Requires `integrations:write`. 400 when the config is invalid for the integration.
-   */
-  public static configureConnection<ThrowOnError extends boolean = false>(
-    parameters: {
-      id: string;
-      config?: {
-        [key: string]: JsonValueInput;
-      };
-      active?: boolean;
-    },
-    options?: Options<never, ThrowOnError>,
-  ): RequestResult<ConfigureConnectionResponses, ConfigureConnectionErrors, ThrowOnError, "data"> {
-    const params = buildClientParams(
-      [parameters],
-      [
-        {
-          args: [
-            { in: "path", key: "id" },
-            { in: "body", key: "config" },
-            { in: "body", key: "active" },
-          ],
-        },
-      ],
-    );
-    return (options?.client ?? client).patch<
-      ConfigureConnectionResponses,
-      ConfigureConnectionErrors,
-      ThrowOnError,
-      "data"
-    >({
-      responseStyle: "data",
-      url: "/api/integrations/{id}",
-      ...options,
-      ...params,
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-        ...params.headers,
-      },
-    });
-  }
-
-  /**
-   * Replace a connection's secrets
-   *
-   * Requires `integrations:write`. The new secrets replace the stored ones.
-   */
-  public static reconnectIntegration<ThrowOnError extends boolean = false>(
-    parameters: {
-      id: string;
-      secrets: {
-        [key: string]: JsonValueInput;
-      };
-    },
-    options?: Options<never, ThrowOnError>,
-  ): RequestResult<
-    ReconnectIntegrationResponses,
-    ReconnectIntegrationErrors,
-    ThrowOnError,
-    "data"
-  > {
-    const params = buildClientParams(
-      [parameters],
-      [
-        {
-          args: [
-            { in: "path", key: "id" },
-            { in: "body", key: "secrets" },
-          ],
-        },
-      ],
-    );
-    return (options?.client ?? client).post<
-      ReconnectIntegrationResponses,
-      ReconnectIntegrationErrors,
-      ThrowOnError,
-      "data"
-    >({
-      responseStyle: "data",
-      url: "/api/integrations/{id}/reconnect",
-      ...options,
-      ...params,
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-        ...params.headers,
-      },
-    });
-  }
-
-  /**
-   * Invoke one of a connection's actions
-   *
-   * Requires `integrations:write`. Runs the action, such as a listing that feeds a picker, with `input` checked against its input schema. 400 when the action fails or rejects the input; 404 when the connection or action does not exist; 409 when the connection is inactive.
-   */
-  public static invokeConnectionAction<ThrowOnError extends boolean = false>(
-    parameters: {
-      id: string;
-      actionId: string;
-      input?: {
-        [key: string]: unknown;
-      };
-    },
-    options?: Options<never, ThrowOnError>,
-  ): RequestResult<
-    InvokeConnectionActionResponses,
-    InvokeConnectionActionErrors,
-    ThrowOnError,
-    "data"
-  > {
-    const params = buildClientParams(
-      [parameters],
-      [
-        {
-          args: [
-            { in: "path", key: "id" },
-            { in: "path", key: "actionId" },
-            { in: "body", key: "input" },
-          ],
-        },
-      ],
-    );
-    return (options?.client ?? client).post<
-      InvokeConnectionActionResponses,
-      InvokeConnectionActionErrors,
-      ThrowOnError,
-      "data"
-    >({
-      responseStyle: "data",
-      url: "/api/integrations/{id}/actions/{actionId}",
-      ...options,
-      ...params,
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-        ...params.headers,
-      },
     });
   }
 }

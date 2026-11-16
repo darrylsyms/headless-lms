@@ -27,12 +27,14 @@ function StudentsTableInner({
   params,
   roles,
   titles,
+  commerceOrigin,
 }: {
   rows: Student[];
   total: number;
   params: ListParams;
   roles: OrgRole[];
   titles: Record<string, string>;
+  commerceOrigin?: string;
 }) {
   const permissions = usePermissions();
   const canWrite = permissions.has("people:write");
@@ -87,12 +89,13 @@ function StudentsTableInner({
     () =>
       studentColumns({
         titles,
+        commerceOrigin,
         onView: goToStudent,
         onSetRole: canSetRole ? setRoleTarget : undefined,
         onResend: canWrite ? resend : undefined,
         onRemove: canRemove ? setToDelete : undefined,
       }),
-    [titles, goToStudent, canSetRole, canWrite, canRemove, resend],
+    [titles, commerceOrigin, goToStudent, canSetRole, canWrite, canRemove, resend],
   );
 
   return (
@@ -163,6 +166,7 @@ export function StudentsTable(props: {
   params: ListParams;
   roles: OrgRole[];
   titles: Record<string, string>;
+  commerceOrigin?: string;
 }) {
   // `useDataTable` reads `useSearchParams()`, which requires a Suspense
   // boundary in the App Router.

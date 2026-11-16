@@ -7,6 +7,10 @@ export const OrgUserStatus = z.enum(['invited', 'active']);
 export type OrgUserStatus = z.infer<typeof OrgUserStatus>;
 
 export const Student = OrgUserProfileSchema.extend({
+  wooCustomerId: z.number().int().positive().nullable().optional(),
+  wooSubscribed: z.boolean().nullable().optional(),
+  wooSyncIssues: z.array(z.string()).optional(),
+  wooSyncHealth: z.enum(['ok', 'error', 'unknown']).optional(),
   entitlementCount: z.number().int(),
   /** 0–100, averaged across active entitlements. */
   avgProgress: z.number().int(),

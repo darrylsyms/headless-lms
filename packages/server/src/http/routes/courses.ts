@@ -22,6 +22,18 @@ export async function coursesRoutes(app: FastifyInstance, container: Container):
   const r = app.withTypeProvider<ZodTypeProvider>();
   const courses = container.content;
 
+  const productMapping = z.object({ courseId: z.string(), productIds: z.array(z.number().int().positive().max(2147483647)).max(100) });
+  r.route({
+    method: 'GET', url: '/api/courses/:courseId/product-mapping', preHandler: app.requireOrgSession,
+    schema: { operationId: 'getCourseProductMapping', tags: ['Integrations'], params: z.object({ courseId: z.string() }), response: { 200: productMapping.nullable(), ...refusals(403, 404) } },
+    handler: async (req) => container.productCourseMappings.get(req.params.courseId, await resolveActor(container, req)),
+  });
+  r.route({
+    method: 'PUT', url: '/api/courses/:courseId/product-mapping', preHandler: app.requireOrgSession,
+    schema: { operationId: 'replaceCourseProductMapping', tags: ['Integrations'], params: z.object({ courseId: z.string() }), body: z.object({ productIds: z.array(z.number().int().positive().max(2147483647)).max(100) }), response: { 204: z.null(), ...refusals(400, 403, 404) } },
+    handler: async (req, reply) => { await container.productCourseMappings.replace({ courseId: req.params.courseId, productIds: req.body.productIds }, await resolveActor(container, req)); return reply.code(204).send(null); },
+  });
+
   const feed = z.object({ courseId: z.string(), moduleId: z.string() });
   r.route({
     method: 'GET', url: '/api/insider-feed', preHandler: app.requireOrgSession,

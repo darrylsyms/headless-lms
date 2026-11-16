@@ -12,6 +12,7 @@ import {
   foreignKey,
   unique,
   uniqueIndex,
+  index,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import type { Connection } from "@headless-lms/core/schemas";
@@ -89,6 +90,33 @@ export const purchaseSyncCustomers = pgTable(
   }),
 );
 
+export const purchaseSyncFailures = pgTable(
+  "purchase_sync_failures",
+  {
+    orgId: text("org_id").notNull(),
+    orgUserId: text("org_user_id").notNull(),
+    target: text("target").notNull(),
+    attempts: integer("attempts").notNull().default(1),
+    firstFailedAt: timestamp("first_failed_at", { withTimezone: true }).notNull().defaultNow(),
+    lastFailedAt: timestamp("last_failed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.orgId, t.orgUserId, t.target] }),
+    userFk: foreignKey({ columns: [t.orgId, t.orgUserId], foreignColumns: [orgUsers.orgId, orgUsers.id] }).onDelete("cascade"),
+  }),
+);
+
+export const purchaseSyncHealth = pgTable(
+  "purchase_sync_health",
+  {
+    orgId: text("org_id").notNull().references(() => organizations.id),
+    integrationId: text("integration_id").notNull(),
+    state: text("state", { enum: ["ok", "error"] }).notNull(),
+    checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.orgId, t.integrationId] }) }),
+);
+
 export const purchaseSyncMappings = pgTable(
   "purchase_sync_mappings",
   {
@@ -124,5 +152,26 @@ export const purchaseSyncMappings = pgTable(
     bundleOnce: uniqueIndex("purchase_sync_mapping_bundle_owner_idx")
       .on(t.orgId, t.orgUserId, t.bundleId)
       .where(sql`${t.managesSubscription}`),
+  }),
+);
+
+export const purchaseSyncWebhookJobs = pgTable(
+  "purchase_sync_webhook_jobs",
+  {
+    orgId: text("org_id").notNull().references(() => organizations.id),
+    deliveryId: text("delivery_id").notNull(),
+    topic: text("topic").notNull(),
+    resourceId: integer("resource_id").notNull(),
+    state: text("state").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+    leaseId: text("lease_id"),
+    leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.orgId, t.deliveryId] }),
+    dueIdx: index("purchase_sync_webhook_due_idx").on(t.orgId, t.state, t.nextAttemptAt),
   }),
 );

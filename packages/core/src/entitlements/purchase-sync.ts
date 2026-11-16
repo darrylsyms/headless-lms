@@ -10,6 +10,8 @@ type State = { capturedAt: number; known: Record<TargetName, string[]>; managed?
 type LedgerKey = { orgId: string; orgUserId: string; integrationId: string };
 type GrantKey = { orgUserId: string; contentId?: string; bundleId?: string };
 type Scope = {
+  identity?: { lock(orgId: string, orgUserId: string, providerId: string, customerId: number): Promise<boolean> };
+  productMappings?: { lock(orgId: string, courseId: string): Promise<{ productIds: number[] } | null> };
   ledger: {
     initialize(key: LedgerKey): Promise<void>;
     get(key: LedgerKey): Promise<{ revision: number; state: State | null } | null>;
@@ -40,9 +42,11 @@ export class PurchaseSyncService {
     input: {
       orgUserId: string;
       integrationId: string;
-      courseId: string;
+      courseId?: string;
       bundleId: string;
       expectedRevision: number;
+      expectedCourseProductIds?: number[];
+      expectedIdentity?: { providerId: string; customerId: number };
       snapshot: Pick<State, 'capturedAt' | 'known'>;
       decisions: Record<TargetName, 'grant' | 'revoke' | 'hold'>;
     },
@@ -51,7 +55,7 @@ export class PurchaseSyncService {
     actor.permissions.require('access:write');
     if (
       !input.orgUserId ||
-      !input.courseId ||
+      (!input.courseId && input.decisions.course !== 'hold') ||
       !input.bundleId ||
       !/^[a-z0-9][a-z0-9-]{0,63}$/.test(input.integrationId) ||
       !Number.isSafeInteger(input.expectedRevision) ||
@@ -75,7 +79,14 @@ export class PurchaseSyncService {
       integrationId: input.integrationId,
     };
     const source = `integration:${input.integrationId}`;
-    return this.uow.run(async ({ ledger, grants, outbox }) => {
+    return this.uow.run(async ({ ledger, grants, outbox, productMappings, identity }) => {
+      if (input.expectedIdentity && (!identity || !(await identity.lock(actor.orgId, input.orgUserId, input.expectedIdentity.providerId, input.expectedIdentity.customerId))))
+        {throw new ConflictError('The verified customer identity changed.');}
+      if (input.expectedCourseProductIds) {
+        if (!productMappings || !input.courseId) {throw new Error('Mapping consistency check is unavailable.');}
+        const mapping = await productMappings.lock(actor.orgId, input.courseId);
+        if (!mapping || JSON.stringify(mapping.productIds) !== JSON.stringify(input.expectedCourseProductIds)) {throw new ConflictError('The course product mapping changed.');}
+      }
       await ledger.initialize(key);
       const current = await ledger.get(key);
       if (
@@ -88,7 +99,7 @@ export class PurchaseSyncService {
         if (current.state?.known[name].some((id) => !input.snapshot.known[name].includes(id)))
           {throw new ConflictError('Previously observed purchases are missing.');}
       }
-      if ((await grants.contentTypeOf(actor.orgId, input.courseId)) !== 'course')
+      if (input.courseId && (await grants.contentTypeOf(actor.orgId, input.courseId)) !== 'course')
         {throw new Error('The mapped course does not exist.');}
       const managed: Managed = { ...current.state?.managed };
       const held: TargetName[] = [];
@@ -99,7 +110,7 @@ export class PurchaseSyncService {
         }
         const target: GrantKey =
           name === 'course'
-            ? { orgUserId: input.orgUserId, contentId: input.courseId }
+            ? { orgUserId: input.orgUserId, contentId: input.courseId! }
             : { orgUserId: input.orgUserId, bundleId: input.bundleId };
         const existing = await grants.lockIntegrationGrant(actor.orgId, target);
         const prior = managed[name];

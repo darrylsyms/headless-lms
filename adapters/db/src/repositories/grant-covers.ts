@@ -36,6 +36,10 @@ export function grantOpens(row: GrantColumns, contentId: SQL, type: GrantedConte
     and (
       ${row.contentId} = ${contentId}
       or exists (
+        select 1 from purchase_sync_all_access_bundles ab
+        where ab.org_id = ${row.orgId} and ab.bundle_id = ${row.bundleId}
+      )
+      or exists (
         select 1 from bundle_items bi
         where bi.org_id = ${row.orgId}
           and bi.bundle_id = ${row.bundleId}
