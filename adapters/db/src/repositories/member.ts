@@ -21,6 +21,7 @@ import {
 import type { Logger } from "@headless-lms/core/shared/ports";
 import { noopLogger } from "@headless-lms/core/shared/logger";
 import { translateDbErrors } from "./pg-errors.js";
+import { DrizzleAdminRepository } from "./admin.js";
 import { communityMember, communityPublished, oneOf } from "./grant-covers.js";
 import {
   directEventGrantIds,
@@ -49,6 +50,33 @@ export class DrizzleMemberRepository implements MemberReportRepository {
     private readonly db: NodePgDatabase,
     private readonly logger: Logger = noopLogger,
   ) {}
+
+  async profileBadge(orgId: string, orgUserId: string): Promise<"subscriber" | "student" | null> {
+    const status = await new DrizzleAdminRepository(this.db).getStudent(orgId, orgUserId);
+    if (!status || status.wooSyncHealth !== "ok" || status.wooSyncIssues?.length || status.wooSubscribed == null) {return null;}
+    if (status.wooSubscribed) {return "subscriber";}
+    const result = await this.db.execute(sql`
+      select 1 from purchase_sync_ledgers l
+      join entitlements e on e.org_id=l.org_id and e.org_user_id=l.org_user_id
+        and e.id=l.state->'managed'->'course'->>'id'
+        and e.xmin::text=l.state->'managed'->'course'->>'version'
+        and e.source='integration:' || l.integration_id
+      where l.org_id=${orgId} and l.org_user_id=${orgUserId}
+        and e.content_id is not null and e.status='active' and (e.expires_at is null or e.expires_at > now())
+        and case when coalesce(l.state->>'capturedAt', '') ~ '^[0-9]{1,16}$' then (l.state->>'capturedAt')::numeric between extract(epoch from now() - interval '5 minutes') * 1000 and extract(epoch from now()) * 1000 else false end
+        and case when jsonb_typeof(l.state->'known'->'course') = 'array' then jsonb_array_length(l.state->'known'->'course') > 0 else false end
+      limit 1
+    `);
+    return result.rows.length ? "student" : null;
+  }
+
+  async profilePerson(orgId: string, communityId: string, orgUserId: string, readerIds: string[], staff: boolean): Promise<(DirectoryRow & { extra: unknown }) | null> {
+    const [row] = await this.db.select({ ...personColumns(orgId), extra: userProfiles.extra }).from(orgUsers)
+      .leftJoin(userProfiles, eq(userProfiles.userId, orgUsers.userId))
+      .leftJoin(users, eq(users.id, orgUsers.userId))
+      .where(and(eq(orgUsers.orgId, orgId), eq(orgUsers.id, orgUserId), eq(orgUsers.status, "active"), staff ? undefined : communityMember(sql`${orgUsers.orgId}`, sql`${orgUsers.id}`, sql`${communityId}`, readerIds))).limit(1);
+    return row ?? null;
+  }
 
   async directory(
     orgId: string,

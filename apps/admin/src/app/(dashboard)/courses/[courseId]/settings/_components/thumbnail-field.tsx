@@ -9,9 +9,10 @@
  */
 
 import { useRef, useState } from "react";
-import { ImageIcon, Loader2, Trash2, Upload } from "lucide-react";
+import { ImageIcon, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
+import { ArtworkRemoveButton } from "@/components/artwork-remove-button";
 import { SettingsSection } from "@/components/forms/settings-section";
 import { Button } from "@/components/ui/button";
 import { AssetPickerDialog } from "@/app/(dashboard)/media/_components/asset-picker-dialog";
@@ -25,7 +26,9 @@ export function ThumbnailField({
   courseId,
   assetId,
   url,
+  background = false,
 }: {
+  background?: boolean;
   courseId: string;
   assetId: string | null;
   /** The course's thumbnail URL, as the course read served it. */
@@ -44,7 +47,7 @@ export function ThumbnailField({
     setPreview(next);
     setBusy("save");
     try {
-      await setCourseThumbnailAction(courseId, next?.id ?? null);
+      await setCourseThumbnailAction(courseId, next?.id ?? null, background);
       toast.success(next ? "Thumbnail updated" : "Thumbnail removed");
     } catch (err) {
       setPreview(rollback);
@@ -92,11 +95,11 @@ export function ThumbnailField({
 
   return (
     <SettingsSection
-      title="Thumbnail"
-      description="The cover image for this course. Upload a new one or link an image already in your media library."
+      title={background ? "Lesson background" : "Thumbnail"}
+      description={background ? "Used for this course’s lessons." : "Shown on the course card."}
     >
       <div className="flex flex-col gap-4">
-        <div className="relative grid aspect-video w-56 shrink-0 place-items-center overflow-hidden rounded-card border border-line bg-well">
+        <div className="group relative grid aspect-video w-56 shrink-0 place-items-center overflow-hidden rounded-card border border-line bg-well">
           {preview ? (
             // The API redirects to a signed storage URL — next/image would need
             // every storage host allowlisted, so this stays a plain img.
@@ -105,6 +108,7 @@ export function ThumbnailField({
           ) : (
             <ImageIcon className="size-6 text-ink-4" aria-hidden />
           )}
+          {preview && <ArtworkRemoveButton label={background ? "Remove lesson background" : "Remove course thumbnail"} disabled={disabled} onClick={() => void save(null)} />}
           {uploading && (
             <div className="absolute inset-0 grid place-items-center gap-2 bg-surface/80 text-xs text-ink-3">
               <Loader2 className="size-4 animate-spin" />
@@ -144,20 +148,10 @@ export function ThumbnailField({
               <ImageIcon />
               Choose from library
             </Button>
-            {preview && (
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={disabled}
-                onClick={() => void save(null)}
-              >
-                <Trash2 />
-                Remove
-              </Button>
-            )}
+
           </div>
           <p className="text-sm text-ink-3">
-            A wide image works best — it is cropped to 16:9 on the course card.
+            A wide image works best — it is cropped to 16:9.
           </p>
         </div>
 

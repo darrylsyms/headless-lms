@@ -3,6 +3,7 @@ import {
   createDb,
   type DatabasePoolOptions,
   DrizzleAssetsRepository,
+  DrizzleMediaFoldersRepository,
   DrizzleAutomationRunsRepository,
   DrizzleAutomationsRepository,
   DrizzleConnectionsRepository,
@@ -32,6 +33,7 @@ import {
   DrizzleSettingsRepository,
   DrizzleSubscriptionsRepository,
   DrizzleUnitOfWork,
+  StagingSignoutChallengeStore,
 } from '@headless-lms/adapter-db';
 import { InMemoryEventBus } from '@headless-lms/adapter-defaults/events';
 import {
@@ -98,11 +100,15 @@ import {
 } from '@headless-lms/core/organizations';
 import {
   AssetsServiceImpl,
+  MediaFoldersService,
   assetsJobs,
   assetsRecurringJobs,
   createFileUrls,
 } from '@headless-lms/core/assets';
 import { IntegrationsServiceImpl } from '@headless-lms/core/integrations';
+import { SupportService } from '@headless-lms/core/support';
+import { organizationEmailSender, organizationNotificationMailer, singleOrganizationEmailSender } from './organization-email.js';
+import { UnavailableError } from '@headless-lms/core/shared/errors';
 import {
   AutomationsServiceImpl,
   DEFAULT_COMMUNITY_CATEGORIES,
@@ -169,6 +175,8 @@ export interface AdapterOverrides {
 export interface BuildContainerOptions {
   /** Installation's plugins folder, scanned by loadIntegrations. Absent → no integrations. */
   pluginsDir?: string;
+  notificationEmailSink?: boolean;
+  singleOrganizationEmail?: boolean;
   adapters?: AdapterOverrides;
   externalIdentity?: (db: ReturnType<typeof createDb>) => Promise<CreateAuthOptions['externalIdentity']>;
   roles?: readonly RoleDefinition[];
@@ -249,6 +257,7 @@ export function resolveLoggingConfig(config: LoggingConfig = {}): Required<Loggi
 
 export interface Container {
   auth: BetterAuth;
+  stagingSignoutChallenges: StagingSignoutChallengeStore;
   mcp: McpEndpoints;
   platform: PlatformKeyCheck | null;
   // Org Provider
@@ -268,7 +277,9 @@ export interface Container {
   chats: ChatServiceImpl;
   subscriptions: SubscriptionServiceImpl;
   assets: AssetsServiceImpl;
+  mediaFolders: MediaFoldersService;
   integrations: IntegrationsServiceImpl;
+  support: SupportService;
   automations: AutomationsServiceImpl;
   notificationTypes: NotificationTypeRegistry;
   notificationChannels: ChannelRegistry;
@@ -340,6 +351,7 @@ export async function buildContainer(
 
   // Outbound adapters
   const db = createDb(config.databaseUrl, logger.child({ name: 'db' }), config.databasePool);
+  const integrationsRegistry = await loadIntegrations(options?.pluginsDir, integrationsLogger);
   const email = options?.adapters?.email ?? new EmailAdapter(logger.child({ name: 'email' }));
   const storage: ObjectStorage =
     options?.adapters?.storage ?? new StorageAdapter(logger.child({ name: 'storage' }));
@@ -356,10 +368,35 @@ export async function buildContainer(
     typeof pubsubOption === 'function'
       ? pubsubOption(logger.child({ name: 'pubsub' }))
       : (pubsubOption ?? null);
-  const mailer = new Mailer(templates, email, {
+  const emailContext = {
     ...(config.emailBranding ?? { brandName: 'Headless LMS', baseUrl: config.adminAppUrl }),
     studentPortalUrl: config.studentPortalUrl,
+  };
+  const fallbackMailer = new Mailer(templates, email, emailContext);
+  const organizationEmailDependencies = (orgId: string) => ({
+    orgId,
+    useSink: !!options?.notificationEmailSink,
+    fallback: fallbackMailer,
+    fallbackSender: email,
+    templates,
+    context: emailContext,
+    connection: (id: string) => integrations.getByIntegration(id, 'amazon-ses'),
+    integration: () => integrationsRegistry.get('amazon-ses'),
+    secrets: (id: string, reference: string) => credentialStore.reveal(id, reference),
   });
+  const systemEmail: EmailSender = {
+    send: async message => {
+      if (!options?.singleOrganizationEmail) { return email.send(message); }
+      const sender = await singleOrganizationEmailSender({
+        useSink: !!options?.notificationEmailSink,
+        fallback: email,
+        organizationIds: () => organizationsRepo.firstOrganizationIds(),
+        forOrganization: orgId => organizationEmailSender(organizationEmailDependencies(orgId)),
+      });
+      await sender.send(message);
+    },
+  };
+  const mailer = new Mailer(templates, systemEmail, emailContext);
 
   const fileUrls = createFileUrls(config.authBaseURL, (key) => storage.publicUrl(key));
   const assets = new AssetsServiceImpl({
@@ -472,7 +509,8 @@ export async function buildContainer(
   const notificationRegistries = buildNotificationRegistries({
     declarations: NOTIFICATION_TYPES,
     defaults: { community: DEFAULT_COMMUNITY_CATEGORIES, org: DEFAULT_ORG_CATEGORIES },
-    mailer: options?.adapters?.email ? mailer : null,
+    mailer: options?.adapters?.email || integrationsRegistry.get('amazon-ses') ? mailer : null,
+    mailerForOrg: orgId => organizationNotificationMailer(organizationEmailDependencies(orgId)),
     emailOf: async (_orgId, userId) => (await identity.getUserById(userId))?.email ?? null,
     push: pushSender
       ? {
@@ -671,7 +709,9 @@ export async function buildContainer(
       fileUrls,
     }),
     member: new MemberReportServiceImpl({
+      productMappings: new ProductCourseMappingsRepository(db),
       repo: new DrizzleMemberRepository(db, reportingLogger),
+      activityViews: progress,
       content,
       progress,
       files: assets,
@@ -697,7 +737,6 @@ export async function buildContainer(
   // plugins folder (directory name = integration id), loaded at startup.
   // Connect/configure reject undeclared ids and validate config with the
   // integration's own schema. No folder → no integrations.
-  const integrationsRegistry = await loadIntegrations(options?.pluginsDir, integrationsLogger);
   // Integrations: credential + connection writes + outbox append in one tx
   // (a tx-bound credential store instance shares the scope's transaction).
   const integrationsUow = new DrizzleUnitOfWork(db, (tx) => ({
@@ -712,6 +751,15 @@ export async function buildContainer(
     credentials: credentialStore,
     logger: integrationsLogger,
   });
+  const supportIdentity = new DrizzleIdentityRepository(db, logger.child({ name: 'support_identity' }));
+  const support = new SupportService(
+    userId => supportIdentity.findWordPressContact(userId),
+    async (orgId, request) => {
+      const connection = await integrations.getByIntegration(orgId, 'amazon-ses');
+      if (!connection?.active) { throw new UnavailableError('Support email is not configured.'); }
+      await integrations.invoke(connection.id, 'sendSupportRequest', request, organizations.systemActor(orgId));
+    },
+  );
 
   // Automations: run writes + outbox append in one tx; the engine drives
   // execution (register below), integrations supplies the loaded
@@ -962,6 +1010,7 @@ export async function buildContainer(
 
   return {
     auth,
+    stagingSignoutChallenges: new StagingSignoutChallengeStore(db.$client),
     mcp,
     platform,
     identity,
@@ -972,6 +1021,7 @@ export async function buildContainer(
     courseCategories: new CourseCategories(new DrizzleCourseCategoriesRepository(db)),
     productCourseMappings: new ProductCourseMappingService(new ProductCourseMappingsRepository(db)),
     insiderCategories: new CourseCategories(new DrizzleInsiderCategoriesRepository(db)),
+    mediaFolders: new MediaFoldersService(new DrizzleMediaFoldersRepository(db)),
     entitlements,
     progress,
     discussion,
@@ -980,6 +1030,7 @@ export async function buildContainer(
     subscriptions,
     assets,
     integrations,
+    support,
     automations,
     notificationTypes: notificationRegistries.types,
     notificationChannels: notificationRegistries.channels,

@@ -479,6 +479,12 @@ export class ContentService
   ): Promise<CourseSettings> {
     this.require(actor, 'courses:write', id);
     const orgId = actor.orgId;
+    if (value.lessonBackgroundAssetId) {
+      const ready = await this.files.readyFiles(orgId, [value.lessonBackgroundAssetId]);
+      if (!ready[value.lessonBackgroundAssetId]?.contentType.startsWith('image/')) {
+        throw new InvalidInputError('Lesson background must be an image asset');
+      }
+    }
     const merged = await this.uow.run(async ({ content, outbox }) => {
       const course = await content.findCourseById(orgId, id);
       if (!course) {
@@ -666,12 +672,13 @@ export class ContentService
     courseId: string,
     moduleId: string,
     orderedIds: string[],
+    parentActivityId: string | undefined,
     actor: Actor,
   ): Promise<Module[]> {
     this.require(actor, 'courses:write', courseId);
     const orgId = actor.orgId;
     const modules = await this.uow.run(async ({ content, outbox }) => {
-      const reordered = await content.reorderActivities(orgId, courseId, moduleId, orderedIds);
+      const reordered = await content.reorderActivities(orgId, courseId, moduleId, orderedIds, parentActivityId);
       const module = reordered.find((m) => m.id === moduleId);
       if (!module) {
         throw new NotFoundError('Module', moduleId);
@@ -689,6 +696,7 @@ export class ContentService
     activityId: string,
     targetModuleId: string,
     position: number,
+    targetParentActivityId: string | undefined,
     actor: Actor,
   ): Promise<Module[]> {
     this.require(actor, 'courses:write', courseId);
@@ -701,6 +709,7 @@ export class ContentService
         activityId,
         targetModuleId,
         position,
+        targetParentActivityId,
       );
       await outbox.append(
         reordered
@@ -763,6 +772,9 @@ export class ContentService
           });
           throw new NotFoundError('Activity', activityId);
         }
+        if (input.parentActivityId !== undefined && input.parentActivityId !== (existing.parentActivityId ?? null)) {
+          throw new InvalidInputError('Changing an activity parent is not supported');
+        }
         wasPublished = isPublishedActivity(existing.settings);
         previousPublishedAt = existing.publishedAt;
         previousScheduledAt = existing.scheduledAt;
@@ -775,6 +787,11 @@ export class ContentService
             moduleId,
           });
           throw new NotFoundError('Module', moduleId);
+        }
+        if (input.parentActivityId) {
+          const parent = await content.findActivity(orgId, input.parentActivityId);
+          if (!parent || parent.courseId !== courseId || parent.moduleId !== moduleId) { throw new NotFoundError('Activity', input.parentActivityId); }
+          if (parent.parentActivityId) { throw new InvalidInputError('Topics cannot contain topics'); }
         }
       }
 

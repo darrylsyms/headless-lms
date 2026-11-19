@@ -861,6 +861,24 @@
           "description": null
         },
         {
+          "name": "lessonBackgroundAssetId",
+          "type": "string | null",
+          "required": false,
+          "description": null
+        },
+        {
+          "name": "trailerUrl",
+          "type": "string | null",
+          "required": false,
+          "description": null
+        },
+        {
+          "name": "bodyDescription",
+          "type": "string | null",
+          "required": false,
+          "description": null
+        },
+        {
           "name": "comments",
           "type": "object",
           "required": false,

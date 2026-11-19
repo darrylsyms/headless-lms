@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import slack from "./slack/index.js";
+import ses from "./amazon-ses/index.js";
 
 // Per-integration behaviour is tested where the integration lives (the slack
 // actions in @headless-lms/plugin-slack). This suite covers what the plugin
@@ -11,6 +12,7 @@ import slack from "./slack/index.js";
 describe("integrations directory contract", () => {
   it("ids match their directory names (loader invariant)", () => {
     expect(slack.id).toBe("slack");
+    expect(ses.id).toBe("amazon-ses");
   });
 
   it("each exposes its secrets as JSON Schema", () => {
@@ -32,7 +34,7 @@ describe("integrations directory contract", () => {
 });
 
 describe("loadIntegrations over the real plugins directory", () => {
-  it("discovers exactly the slack integration", async () => {
+  it("discovers the installed integrations", async () => {
     const script =
       "const { loadIntegrations } = await import(process.argv[1]); const registry = await loadIntegrations(process.argv[2]); console.log(JSON.stringify(registry.list().map((item) => item.id)));";
     const loader = new URL("../../../../packages/server/src/app/integrations.ts", import.meta.url)
@@ -50,7 +52,7 @@ describe("loadIntegrations over the real plugins directory", () => {
       ],
       { cwd: fileURLToPath(new URL("../../", import.meta.url)) },
     );
-    expect(JSON.parse(stdout.trim())).toEqual(["slack"]);
+    expect(JSON.parse(stdout.trim()).sort()).toEqual(["amazon-ses", "slack"]);
   });
 });
 
@@ -58,5 +60,13 @@ describe("integration config validators", () => {
   it("slack requires a defaultChannel", () => {
     expect(slack.validateConfig({ defaultChannel: "#general" }).ok).toBe(true);
     expect(slack.validateConfig({}).ok).toBe(false);
+  });
+});
+
+describe("Amazon SES integration", () => {
+  it("requires the region, sender and support inbox", () => {
+    expect(ses.validateConfig({ region: "eu-west-1", from: "sender@example.com", supportEmail: "help@example.com" }).ok).toBe(true);
+    expect(ses.validateConfig({ region: "eu-west-1" }).ok).toBe(false);
+    expect(ses.secretsSchema()).toMatchObject({ type: "object", required: ["accessKeyId", "secretAccessKey"] });
   });
 });

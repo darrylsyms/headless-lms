@@ -27,6 +27,14 @@ export type {
   Module,
 } from '../../content/index.js';
 
+export interface CourseCatalogOverview {
+  course: import('../../content/index.js').CourseView;
+  modules: import('../../content/index.js').Module[];
+  activities: { id: string; moduleId: string; parentActivityId: string | null; seq: number; title: string }[];
+  accessible: boolean;
+  primaryProductId?: number | null;
+}
+
 /** Per-course progress for the student surface. Derived on read against the
  *  current published structure — never stored. */
 export interface DirectoryRow {

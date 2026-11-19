@@ -39,12 +39,14 @@ export function ItemRow({
   moduleId,
   canEdit,
   reordering = false,
+  topicCount = 0,
 }: {
   item: Activity;
   courseId: string;
   moduleId: string;
   canEdit: boolean;
   reordering?: boolean;
+  topicCount?: number;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -52,20 +54,21 @@ export function ItemRow({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } =
     useSortable({
       id: item.id,
-      data: { kind: "activity", moduleId },
+      data: { kind: item.parentActivityId ? "topic" : "activity", moduleId, parentActivityId: item.parentActivityId },
       disabled: !canEdit || reordering,
     });
 
   const settings = settingsOf(item);
   const published = activityPublished(settings);
   const title = settings.title?.trim() || "Untitled activity";
+  const kind = item.parentActivityId ? "topic" : "activity";
 
   function onTogglePublish() {
     const next = !published;
     startTransition(async () => {
       try {
         await setActivityPublishedAction(courseId, moduleId, item.id, next);
-        toast.success(next ? "Activity published" : "Moved to draft");
+        toast.success(next ? `${kind === "topic" ? "Topic" : "Activity"} published` : "Moved to draft");
       } catch (err) {
         toast.error("Something went wrong", { description: (err as Error).message });
       }
@@ -76,7 +79,7 @@ export function ItemRow({
     startTransition(async () => {
       try {
         await deleteActivityAction(courseId, moduleId, item.id);
-        toast.success("Activity deleted");
+        toast.success(kind === "topic" ? "Topic deleted" : "Activity deleted");
         setConfirmOpen(false);
       } catch (err) {
         toast.error("Something went wrong", { description: (err as Error).message });
@@ -158,13 +161,13 @@ export function ItemRow({
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title="Delete activity"
+        title={kind === "topic" ? "Delete topic" : "Delete activity"}
         description={
           <>
-            Delete <span className="font-medium text-ink">{title}</span>? This can&apos;t be undone.
+            Delete <span className="font-medium text-ink">{title}</span>{topicCount ? ` and its ${topicCount} ${topicCount === 1 ? "topic" : "topics"}` : ""}? This can&apos;t be undone.
           </>
         }
-        confirmLabel="Delete activity"
+        confirmLabel={kind === "topic" ? "Delete topic" : "Delete activity"}
         pending={isPending}
         onConfirm={confirmDelete}
       />

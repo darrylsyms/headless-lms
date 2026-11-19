@@ -19,6 +19,8 @@ import { DrizzleOutboxAppender } from "./src/repositories/outbox.js";
 import { createWooLmsStore } from "../../../fretwise-lms-frontend/lib/server/woocommerce-lms-store.js";
 import { ProductCourseMappingsRepository } from "./src/repositories/product-course-mappings.js";
 import { DrizzleAdminRepository } from "./src/repositories/admin.js";
+import { DrizzleMemberRepository } from "./src/repositories/member.js";
+import { DrizzleIdentityRepository } from "./src/repositories/identity.js";
 import { PurchaseSyncFailuresRepository } from "./src/repositories/purchase-sync-failures.js";
 import { PurchaseSyncHealthRepository } from "./src/repositories/purchase-sync-health.js";
 import { createWooGeneralStores } from "./woocommerce-general-stores.js";
@@ -341,17 +343,43 @@ describe.skipIf(!url)("product mappings in PostgreSQL", () => {
         const state = {capturedAt: Date.now() - 1000, known: {course: [], subscription: ["1"]}, managed: {subscription: {id: grant, version: String(version.rows[0]!.version)}}};
         await tx.execute(sql`insert into purchase_sync_ledgers (org_id,org_user_id,integration_id,revision,state) values (${org},${member},'woocommerce-local-test',1,${JSON.stringify(state)}::jsonb)`);
         const report = new DrizzleAdminRepository(tx);
+        const profiles = new DrizzleMemberRepository(tx);
+        await new PurchaseSyncHealthRepository(tx).record(org, 'woocommerce-local-test', 'ok');
         const active = await report.getStudent(org,member);
         expect(active?.wooCustomerId).toBe(12345);
         expect(active?.wooSubscribed).toBe(true);
+        expect(await profiles.profileBadge(org, member)).toBe('subscriber');
         await tx.execute(sql`update entitlements set source='manual' where org_id=${org} and id=${grant}`);
         expect((await report.getStudent(org,member))?.wooSubscribed).toBeNull();
+        expect(await profiles.profileBadge(org, member)).toBeNull();
+        await tx.execute(sql`delete from entitlements where org_id=${org} and id=${grant}`);
+        const courseGrant = genId("entitlement");
+        await tx.execute(sql`insert into entitlements (org_id,id,org_user_id,content_id,status,source) values (${org},${courseGrant},${member},${course},'active','integration:woocommerce-local-test')`);
+        const courseVersion = await tx.execute(sql`select xmin::text as version from entitlements where org_id=${org} and id=${courseGrant}`);
+        const courseState = { capturedAt: Date.now() - 1000, known: { course: ['2'], subscription: [] }, managed: { course: { id: courseGrant, version: String(courseVersion.rows[0]!.version) } } };
+        await tx.execute(sql`update purchase_sync_ledgers set state=${JSON.stringify(courseState)}::jsonb where org_id=${org} and org_user_id=${member}`);
+        expect(await profiles.profileBadge(org, member)).toBe('student');
         state.capturedAt = Date.now() - 3600000;
         await tx.execute(sql`update purchase_sync_ledgers set state=${JSON.stringify(state)}::jsonb where org_id=${org} and org_user_id=${member}`);
         expect((await report.getStudent(org,member))?.wooSubscribed).toBeNull();
         throw rollback;
       });
     } catch (error) {if (error !== rollback) {throw error;}}
+  });
+  it("preserves influences and visibility when each is updated separately", async () => {
+    const rollback = new Error("rollback");
+    try {
+      await drizzle(pool).transaction(async (tx) => {
+        const profiles = new DrizzleIdentityRepository(tx);
+        await profiles.upsertProfile(user, { influences: ["John Mayer"] });
+        await profiles.upsertProfile(user, { sharing: { recent: false, saved: true } });
+        const profile = await profiles.findProfile(user);
+        expect(profile?.extra).toMatchObject({ influences: ["John Mayer"], sharing: { recent: false, saved: true } });
+        await profiles.upsertProfile(user, { influences: ["Jimi Hendrix"] });
+        expect((await profiles.findProfile(user))?.extra).toMatchObject({ influences: ["Jimi Hendrix"], sharing: { recent: false, saved: true } });
+        throw rollback;
+      });
+    } catch (error) { if (error !== rollback) {throw error;} }
   });
   it("discovers linked WordPress identities and persists and clears failures", async () => {
     const rollback = new Error("rollback");

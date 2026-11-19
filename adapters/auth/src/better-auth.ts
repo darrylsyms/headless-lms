@@ -10,6 +10,7 @@ import type {
   SessionVerifier,
 } from "@headless-lms/core/types";
 import type { IncomingHttpHeaders } from "node:http";
+import { createHmac } from "node:crypto";
 import { fromNodeHeaders } from "better-auth/node";
 import { APIError, betterAuth, type BetterAuthOptions, type BetterAuthPlugin } from "better-auth";
 import { createAuthMiddleware } from "better-auth/api";
@@ -615,6 +616,23 @@ export class BetterAuth
         activeOrganizationId: (res.session as typeof res.session & { activeOrganizationId?: string | null }).activeOrganizationId ?? null,
       },
     };
+  }
+
+  // Staging-only handoff support: never return the Better Auth session ID or
+  // bearer token. The caller must also check the linked WordPress subject.
+  async stagingSignoutSessionBinding(headers: IncomingHttpHeaders, browserSecret: string, sharedSecret: string): Promise<{ userId: string; binding: string } | null> {
+    if (process.env.NODE_ENV === "production" || process.env.FRETWISE_STAGING_GLOBAL_SIGNOUT !== "1") return null;
+    if (typeof browserSecret !== "string" || typeof sharedSecret !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(browserSecret) || !/^[A-Za-z0-9_-]{43}$/.test(sharedSecret)) return null;
+    const key = Buffer.from(sharedSecret, "base64url");
+    const browser = Buffer.from(browserSecret, "base64url");
+    if (key.length !== 32 || key.toString("base64url") !== sharedSecret || browser.length !== 32 || browser.toString("base64url") !== browserSecret) return null;
+    // Recheck the backing session instead of trusting Better Auth's cookie cache.
+    const current = await this.auth.api.getSession({ headers: fromNodeHeaders(headers), query: { disableCookieCache: true } });
+    const sessionId = current?.session?.id;
+    const userId = current?.user?.id;
+    if (typeof sessionId !== "string" || !/^[A-Za-z0-9._~-]{1,512}$/.test(sessionId) || typeof userId !== "string" || !userId) return null;
+    const binding = createHmac("sha256", key).update(JSON.stringify(["fretwise-staging-signout-binding-v1", "lms", browserSecret, sessionId])).digest("base64url");
+    return { userId, binding };
   }
 
   async stampActiveOrganization(headers: AuthHeaders, orgId: string): Promise<boolean> {

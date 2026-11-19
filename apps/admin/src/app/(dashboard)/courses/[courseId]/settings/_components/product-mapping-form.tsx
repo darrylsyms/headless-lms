@@ -12,7 +12,7 @@ import { lookupStagingProductsAction, searchStagingProductsAction, setCourseProd
 
 type Product = { id: number; name: string };
 
-export function ProductMappingForm({ courseId, productIds }: { courseId: string; productIds: number[] }) {
+export function ProductMappingForm({ courseId, productIds, primaryProductId }: { courseId: string; productIds: number[]; primaryProductId: number | null }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [searchPending, startSearch] = useTransition();
@@ -20,7 +20,9 @@ export function ProductMappingForm({ courseId, productIds }: { courseId: string;
   const [products, setProducts] = useState<Product[]>([]);
   const [selected, setSelected] = useState<Product[]>(() => productIds.map((id) => ({ id, name: "Product name unavailable" })));
   const [savedIds, setSavedIds] = useState(productIds);
-  const isDirty = JSON.stringify(selected.map((item) => item.id)) !== JSON.stringify(savedIds);
+  const [primary, setPrimary] = useState<number | null>(primaryProductId);
+  const [savedPrimary, setSavedPrimary] = useState(primaryProductId);
+  const isDirty = JSON.stringify(selected.map((item) => item.id)) !== JSON.stringify(savedIds) || primary !== savedPrimary;
 
   useEffect(() => {
     let active = true;
@@ -34,10 +36,12 @@ export function ProductMappingForm({ courseId, productIds }: { courseId: string;
 
   function save() {
     const ids = selected.map((product) => product.id);
+    if (ids.length && !primary) { toast.error("Choose a primary product"); return; }
     startTransition(async () => {
       try {
-        await setCourseProductMappingAction(courseId, ids);
+        await setCourseProductMappingAction(courseId, ids, primary);
         setSavedIds(ids);
+        setSavedPrimary(primary);
         router.refresh();
         toast.success("Product mapping saved");
       } catch (error) {
@@ -60,8 +64,8 @@ export function ProductMappingForm({ courseId, productIds }: { courseId: string;
     </Field>
     {products.map((product) => <div key={product.id} className="flex items-center justify-between gap-3"><span>{product.name} ({product.id})</span><Button type="button" variant="secondary" disabled={selected.some((item) => item.id === product.id)} onClick={() => setSelected((current) => [...current, product])}>Add</Button></div>)}
     <div className="flex flex-col gap-3 pt-6">
-      <div className="flex flex-col gap-1"><h3 className="text-sm font-semibold text-ink">Selected products</h3><p className="text-sm text-ink-3">Products connected to this course.</p></div>
-      {selected.length === 0 ? <p className="text-sm text-ink-3">No products selected.</p> : <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-line text-left text-xs text-ink-3"><th className="py-2 pr-4 font-medium">Product</th><th className="py-2 pr-4 font-medium">Product ID</th><th className="py-2 text-right font-medium"><span className="sr-only">Remove</span></th></tr></thead><tbody className="divide-y divide-line">{selected.map((product) => <tr key={product.id}><td className="py-2.5 pr-4 text-ink">{product.name}</td><td className="py-2.5 pr-4 text-ink-2">{product.id}</td><td className="py-2 text-right"><Button type="button" variant="ghost" size="icon-sm" aria-label={`Remove ${product.name} (${product.id})`} onClick={() => setSelected((current) => current.filter((item) => item.id !== product.id))}><X aria-hidden="true" /></Button></td></tr>)}</tbody></table></div>}
+      <div className="flex flex-col gap-1"><h3 className="text-sm font-semibold text-ink">Selected products</h3><p className="text-sm text-ink-3">Choose the primary product whose page students will use to purchase this course.</p></div>
+      {selected.length === 0 ? <p className="text-sm text-ink-3">No products selected.</p> : <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-line text-left text-xs text-ink-3"><th className="py-2 pr-4 font-medium">Product</th><th className="py-2 pr-4 font-medium">Product ID</th><th className="py-2 pr-4 font-medium">Purchase link</th><th className="py-2 text-right font-medium"><span className="sr-only">Remove</span></th></tr></thead><tbody className="divide-y divide-line">{selected.map((product) => <tr key={product.id}><td className="py-2.5 pr-4 text-ink">{product.name}</td><td className="py-2.5 pr-4 text-ink-2">{product.id}</td><td className="py-2 pr-4"><Button type="button" variant="secondary" aria-pressed={primary === product.id} onClick={() => setPrimary(product.id)}>{primary === product.id ? "Primary" : "Set primary"}</Button></td><td className="py-2 text-right"><Button type="button" variant="ghost" size="icon-sm" aria-label={`Remove ${product.name} (${product.id})`} onClick={() => { setSelected((current) => current.filter((item) => item.id !== product.id)); if (primary === product.id) setPrimary(null); }}><X aria-hidden="true" /></Button></td></tr>)}</tbody></table></div>}
     </div>
   </SettingsSection></form>;
 }

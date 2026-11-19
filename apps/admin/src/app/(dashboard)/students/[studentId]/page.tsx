@@ -19,6 +19,9 @@ export default async function StudentDetailPage({
   const { permissions } = await requirePermission("people:read");
   const canSeeAccess = permissions.has("access:read");
   const canGrant = permissions.has("access:write");
+  const memberFrontend = process.env.FRETWISE_MEMBERS_URL ?? (process.env.NODE_ENV !== "production" ? "http://localhost:3020" : "");
+  let profileUrl: string | undefined;
+  try { const url = new URL(memberFrontend); if (["http:", "https:"].includes(url.protocol) && !url.username && !url.password && permissions.has("progress:read")) profileUrl = new URL(`/members/${encodeURIComponent(studentId)}`, url).href; } catch {}
 
   const [student, entitlements, content, analytics] = await Promise.all([
     serverApi.getStudent(studentId),
@@ -33,6 +36,7 @@ export default async function StudentDetailPage({
       entitlements={entitlements}
       content={content}
       analytics={analytics}
+      profileUrl={profileUrl}
     />
   );
 }

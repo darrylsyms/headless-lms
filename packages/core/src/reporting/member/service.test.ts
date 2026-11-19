@@ -86,6 +86,7 @@ function activity(id: string, seq: number, settings: unknown = {}): Activity {
     id,
     moduleId: 'm1',
     courseId: 'c1',
+    parentActivityId: null,
     seq,
     publishedAt: null,
     scheduledAt: null,
@@ -351,6 +352,15 @@ const progressActivities: Activity[] = [
 ];
 
 describe('MemberReportServiceImpl.courseProgress', () => {
+  it('treats an existing course completion as incomplete when a published topic remains', async () => {
+    const topic = { ...activity('topic', 0, { published: true }), parentActivityId: 'a1' };
+    const svc = new MemberReportServiceImpl({ repo: fakeRepo(), content: fakeContent({ c1: course('c1') }, { c1: progressModules }, { c1: [...progressActivities, topic] }), progress: fakeProgress([
+      progressRecord({ targetType: 'activity', targetId: 'a1', completedAt: AT }),
+      progressRecord({ targetType: 'activity', targetId: 'a2', completedAt: AT }),
+      progressRecord({ targetType: 'course', targetId: 'c1', completedAt: AT }),
+    ]), ...deps, access: grantedAccess([{ orgId: 'o1', contentId: 'c1' }]) });
+    expect(await svc.courseProgress('c1', stu)).toMatchObject({ percent: 67, completed: false });
+  });
   it('throws NotFoundError when the student is not enrolled', async () => {
     const svc = new MemberReportServiceImpl({
       repo: fakeRepo(),
@@ -853,6 +863,17 @@ describe('serving files', () => {
     return { svc, signed };
   };
 
+  it('serves a published course background to members but protects drafts', async () => {
+    const content = { findCourse: async () => ({ ...course('c1'), thumbnailUrl: null, settings: { transcriptDownloads: false, lessonBackgroundAssetId: 'ast_background' } }) };
+    const allowed = build({ content });
+    expect(await allowed.svc.lessonBackgroundFile('c1', student)).toBe('https://signed/ast_background');
+    const unassigned = build({ content, grants: [] });
+    expect(await unassigned.svc.lessonBackgroundFile('c1', student)).toBe('https://signed/ast_background');
+    const denied = build({ content: { findCourse: async () => ({ ...course('c1', 'draft'), thumbnailUrl: null, settings: { transcriptDownloads: false, lessonBackgroundAssetId: 'ast_background' } }) }, grants: [] });
+    await expect(denied.svc.lessonBackgroundFile('c1', student)).rejects.toThrow(NotFoundError);
+    expect(denied.signed).toEqual([]);
+  });
+
   it('serves a lesson file the activity links to a student who can open the course', async () => {
     const { svc, signed } = build();
     expect(await svc.activityFile('a1', 'ast_video', student)).toBe('https://signed/ast_video');
@@ -1351,5 +1372,80 @@ describe('directory and viewer', () => {
       permissions: ['courses:read', 'courses:write'],
       orgPermissions: [],
     });
+  });
+});
+
+describe('member course catalog', () => {
+  it('shows a published course outline without exposing lesson content or draft topics', async () => {
+    const content = fakeContent({ c1: course('c1'), draft: course('draft', 'draft') }, { c1: progressModules }, { c1: [
+      activity('a1', 0, { title: 'Lesson', content: { secret: 'private lesson material' } }),
+      { ...activity('t1', 0, { title: 'Topic', content: { secret: 'private topic material' } }), parentActivityId: 'a1' },
+      { ...activity('t2', 1, { title: 'Draft topic', published: false }), parentActivityId: 'a1' },
+      activity('a2', 1, { title: 'Draft lesson', published: false }),
+      { ...activity('t3', 0, { title: 'Hidden child' }), parentActivityId: 'a2' },
+    ] });
+    const svc = new MemberReportServiceImpl({ repo: fakeRepo(), content, progress: fakeProgress([]), ...deps });
+    const result = await svc.courseCatalogOverview('c1', stu);
+    expect(result.accessible).toBe(false);
+    expect(result.activities.map(item => item.title)).toEqual(['Lesson', 'Topic']);
+    expect(JSON.stringify(result)).not.toContain('private lesson material');
+    expect(JSON.stringify(result)).not.toContain('private topic material');
+    await expect(svc.getCourse('c1', stu)).rejects.toThrow(NotFoundError);
+    await expect(svc.listActivities('c1', stu)).rejects.toThrow(NotFoundError);
+    await expect(svc.courseCatalogOverview('draft', stu)).rejects.toThrow(NotFoundError);
+  });
+  it('does not include the Insider Feed in the public course catalog', async () => {
+    const content = fakeContent({ c1: course('c1'), feed: course('feed') }, {});
+    content.getInsiderFeed = async () => ({ courseId: 'feed', moduleId: 'm1' });
+    content.listCourses = async () => ({ rows: [course('c1'), course('feed')], total: 2, page: 1, pageSize: 100 });
+    const svc = new MemberReportServiceImpl({ repo: fakeRepo(), content, progress: fakeProgress([]), ...deps });
+    expect((await svc.courseCatalog(stu)).map(row => row.id)).toEqual(['c1']);
+    await expect(svc.courseCatalogOverview('feed', stu)).rejects.toThrow(NotFoundError);
+  });
+});
+
+describe('community profiles', () => {
+  const person = { orgUserId: 'ou_target', userId: 'usr_target', displayName: 'Player', headline: null, bio: null, imageAssetId: null, extra: { sharing: { recent: false, saved: false } } };
+  const activityViews = {
+    listRecentViews: vi.fn(async () => [{ activityId: 'act_1', courseId: 'crs_1', title: 'Lesson', kind: 'lesson' as const, thumbnailUrl: null, accessible: true, viewedAt: '2026-01-01T00:00:00Z' }]),
+    listAllSaved: vi.fn(async () => [{ activityId: 'act_2', courseId: 'crs_1', title: 'Saved', kind: 'lesson' as const, thumbnailUrl: null, accessible: true }]),
+  };
+  function service(extra: unknown, member = true) {
+    return new MemberReportServiceImpl({
+      ...deps, repo: { ...fakeRepo(), profilePerson: async () => ({ ...person, extra }) },
+      content: fakeContentService({ findCourse: async () => ({ ...course('crs_1'), thumbnailUrl: null }) as never }),
+      progress: fakeProgress([]), activityViews,
+      access: { ...deps.access, isCommunityMember: async () => member, hasAccess: async () => true },
+    });
+  }
+  it('shows rows by default to community members and hides them when disabled', async () => {
+    const shown = await service({}).communityProfile('cmy_1', 'ou_target', stu);
+    expect(shown.recent).toHaveLength(1);
+    expect(shown.saved).toHaveLength(1);
+    const hidden = await service(person.extra).communityProfile('cmy_1', 'ou_target', stu);
+    expect(hidden.recent).toBeNull();
+    expect(hidden.saved).toBeNull();
+  });
+  it('lets authorized staff see hidden rows and rejects nonmembers', async () => {
+    const staff = await service(person.extra, false).communityProfile('cmy_1', 'ou_target', ownerActor);
+    expect(staff.recent).toHaveLength(1);
+    expect(staff.saved).toHaveLength(1);
+    await expect(service({}, false).communityProfile('cmy_1', 'ou_target', stu)).rejects.toThrow(NotFoundError);
+  });
+  it('shows published course entries as locked and withholds inaccessible Insider posts', async () => {
+    const svc = new MemberReportServiceImpl({
+      ...deps, repo: { ...fakeRepo(), profilePerson: async () => ({ ...person, extra: {} }) },
+      content: fakeContentService(), progress: fakeProgress([]),
+      activityViews: {
+        listRecentViews: async () => [
+          { activityId: 'act_1', courseId: 'crs_1', title: 'Lesson', kind: 'lesson', thumbnailUrl: null, accessible: true, viewedAt: '2026-01-01T00:00:00Z' },
+          { activityId: 'act_2', courseId: 'crs_2', title: 'Insider', kind: 'insider', thumbnailUrl: null, accessible: true, viewedAt: '2026-01-01T00:00:00Z' },
+        ],
+        listAllSaved: async () => [],
+      },
+      access: { ...deps.access, isCommunityMember: async () => true },
+    });
+    const result = await svc.communityProfile('cmy_1', 'ou_target', stu);
+    expect(result.recent).toEqual([expect.objectContaining({ activityId: 'act_1', accessible: false })]);
   });
 });

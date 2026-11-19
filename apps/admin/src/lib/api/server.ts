@@ -706,7 +706,7 @@ export const serverApi = {
 
   // media library (assets) — list only; uploads stay client-side
   async listAssets(params: ListParams): Promise<Paginated<Asset>> {
-    return await Assets.listAssets(toQuery(params, ["kind"]), await authHeaders());
+    return await Assets.listAssets(toQuery(params, ["kind", "folderId"]), await authHeaders());
   },
 
   // integrations

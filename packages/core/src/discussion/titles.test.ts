@@ -46,6 +46,7 @@ const activity: Activity = {
   id: 'act_1',
   moduleId: 'mod_1',
   courseId: 'crs_1',
+  parentActivityId: null,
   seq: 0,
   publishedAt: null,
     scheduledAt: null,

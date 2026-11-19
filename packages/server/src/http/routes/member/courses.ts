@@ -4,6 +4,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import {
   ActivityList,
   Course,
+  CourseCatalogOverview,
   MemberCourseIdParam,
   MemberCourses,
   MemberModules,
@@ -23,6 +24,17 @@ export async function memberCoursesRoutes(
     method: 'GET', url: '/api/member/insider-feed', preHandler: app.requireOrgSession,
     schema: { operationId: 'getMemberInsiderFeed', tags: ['Content'], summary: 'Find the Insider Feed you can open', response: { 200: z.object({ courseId: z.string(), moduleId: z.string() }).nullable(), ...refusals(403, 404) } },
     handler: async (req) => member.insiderFeed(await resolveActor(container, req)),
+  });
+
+  r.route({
+    method: 'GET', url: '/api/member/course-catalog', preHandler: app.requireOrgSession,
+    schema: { operationId: 'listMemberCourseCatalog', tags: ['Content'], summary: 'List published courses available to explore', response: { 200: MemberCourses, ...refusals(403) } },
+    handler: async req => member.courseCatalog(await resolveActor(container, req)),
+  });
+  r.route({
+    method: 'GET', url: '/api/member/course-catalog/:courseId', preHandler: app.requireOrgSession,
+    schema: { operationId: 'getMemberCourseCatalogOverview', tags: ['Content'], summary: 'Explore a published course and its published curriculum', params: MemberCourseIdParam, response: { 200: CourseCatalogOverview, ...refusals(403, 404) } },
+    handler: async req => member.courseCatalogOverview(req.params.courseId, await resolveActor(container, req)),
   });
 
   r.route({

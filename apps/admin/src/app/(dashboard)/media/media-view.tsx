@@ -25,7 +25,10 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pagination } from "@/components/data-table/pagination";
 import { AssetCard } from "./_components/asset-card";
 import { AssetPreviewDialog } from "./_components/asset-preview-dialog";
-import { confirmAssetAction, deleteAssetAction, requestUploadAction } from "./actions";
+import { FolderManager } from "./_components/folder-manager";
+import { selectMedia } from "./_components/bulk-selection";
+import type { MediaFolder } from "./actions";
+import { assignMediaFolderAction, confirmAssetAction, deleteAssetAction, requestUploadAction } from "./actions";
 import { putToStorage } from "./upload-to-storage";
 
 const KIND_TABS: { label: string; value: "all" | AssetKind }[] = [
@@ -54,10 +57,12 @@ function MediaViewInner({
   rows,
   total,
   params,
+  folders,
 }: {
   rows: Asset[];
   total: number;
   params: ListParams;
+  folders: MediaFolder[];
 }) {
   const permissions = usePermissions();
   const canUpload = permissions.has("media:write");
@@ -78,6 +83,13 @@ function MediaViewInner({
   const [toDelete, setToDelete] = useState<Asset | null>(null);
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [dragging, setDragging] = useState(false);
+  const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
+  const [bulkMode, setBulkMode] = useState(false);
+  const selectionAnchor = useRef<string | null>(null);
+  function selectAsset(id: string, range: boolean) {
+    setSelectedAssets(old => selectMedia(old, rows.map(row => row.id), id, selectionAnchor.current, range));
+    if (!range || selectionAnchor.current === null) selectionAnchor.current = id;
+  }
 
   const inputRef = useRef<HTMLInputElement>(null);
   const seq = useRef(0);
@@ -85,9 +97,13 @@ function MediaViewInner({
   const activeKind =
     (state.columnFilters.find((f) => f.id === "kind")?.value as string[] | undefined)?.[0] ?? "all";
 
-  function setKind(value: "all" | AssetKind) {
-    state.setColumnFilters(value === "all" ? [] : [{ id: "kind", value: [value] }]);
+  const selectedFolder = (state.columnFilters.find((f) => f.id === "folderId")?.value as string[] | undefined)?.[0] ?? "all";
+  function setFilter(id: string, value: string) {
+    state.setColumnFilters(old => [...old.filter(f => f.id !== id), ...(value === "all" ? [] : [{ id, value: [value] }])]);
+    setSelectedAssets([]);
+    selectionAnchor.current = null;
   }
+  function setKind(value: "all" | AssetKind) { setFilter("kind", value); }
 
   function patchUpload(id: string, patch: Partial<UploadItem>) {
     setUploads((list) => list.map((u) => (u.id === id ? { ...u, ...patch } : u)));
@@ -110,6 +126,10 @@ function MediaViewInner({
             patchUpload(id, { progress: f }),
           );
           await confirmAssetAction(ticket.asset.id);
+          if (selectedFolder !== "all" && selectedFolder !== "unfiled") {
+            try { await assignMediaFolderAction([ticket.asset.id], selectedFolder); }
+            catch { toast.error("File uploaded but could not be added to the folder", { description: file.name }); }
+          }
           patchUpload(id, { progress: 1, status: "done" });
           toast.success("Uploaded", { description: file.name });
           window.setTimeout(() => setUploads((l) => l.filter((u) => u.id !== id)), 2500);
@@ -143,13 +163,22 @@ function MediaViewInner({
     });
   }, [toDelete]);
 
-  const hasFilters = state.search.length > 0 || activeKind !== "all";
+  const hasFilters = state.search.length > 0 || activeKind !== "all" || selectedFolder !== "all";
   const showGrid = rows.length > 0;
 
   return (
     <div
       className="flex flex-col gap-6"
+      onKeyDown={event => {
+        const target = event.target;
+        if (bulkMode && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a" && !(target instanceof HTMLInputElement && target.type !== "checkbox") && !(target instanceof HTMLTextAreaElement) && !(target instanceof HTMLSelectElement) && !(target instanceof HTMLElement && target.isContentEditable)) {
+          event.preventDefault();
+          setSelectedAssets(rows.map(row => row.id));
+          selectionAnchor.current = rows[0]?.id ?? null;
+        }
+      }}
       onDragOver={(e) => {
+        if (!Array.from(e.dataTransfer.types).includes("Files")) return;
         e.preventDefault();
         if (canUpload && !dragging) setDragging(true);
       }}
@@ -174,14 +203,17 @@ function MediaViewInner({
         title="Media library"
         actions={
           canUpload ? (
-            <Button variant="primary" onClick={() => inputRef.current?.click()}>
+            <div className="flex gap-2"><Button variant="secondary" aria-pressed={bulkMode} onClick={() => { setBulkMode(value => !value); setSelectedAssets([]); selectionAnchor.current = null; }}>{bulkMode ? "Done selecting" : "Bulk select"}</Button><Button variant="primary" onClick={() => inputRef.current?.click()}>
               <Upload />
               Upload
-            </Button>
+            </Button></div>
           ) : undefined
         }
       />
 
+      <div className="flex flex-col gap-6 sm:flex-row">
+      <FolderManager folders={folders} selected={selectedFolder} onSelect={id => setFilter("folderId", id)} canWrite={canUpload} selectedAssets={selectedAssets} onMoved={() => setSelectedAssets([])} />
+      <div className="flex min-w-0 flex-1 flex-col gap-6">
       {/* toolbar: search + kind tabs */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full sm:w-64">
@@ -214,14 +246,17 @@ function MediaViewInner({
         </div>
       </div>
 
+      {bulkMode && <div className="flex flex-wrap items-center gap-3"><p className="text-xs text-ink-3">Select files individually, hold Shift for a range, or use Command/Ctrl+A to select this page.</p><Button size="sm" variant="ghost" onClick={() => { setSelectedAssets(rows.map(row => row.id)); selectionAnchor.current = rows[0]?.id ?? null; }}>Select all on page</Button></div>}
       {/* content */}
       {showGrid ? (
         <>
           <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {rows.map((asset) => (
+              <div key={asset.id} className="relative" draggable={canUpload} onClickCapture={event => { if (bulkMode && !(event.target instanceof HTMLInputElement)) { event.preventDefault(); event.stopPropagation(); selectAsset(asset.id, event.shiftKey); } }} onDragStart={e => { const ids = selectedAssets.includes(asset.id) ? selectedAssets : [asset.id]; e.dataTransfer.setData("application/x-fretwise-assets", JSON.stringify(ids)); }}>
+              {canUpload && bulkMode && <label className="absolute top-2 left-2 z-10 flex items-center gap-1 rounded-control bg-surface p-1 text-xs"><input type="checkbox" aria-label={`Select ${asset.filename} for moving`} checked={selectedAssets.includes(asset.id)} onChange={() => {}} onClick={event => { event.stopPropagation(); selectAsset(asset.id, event.shiftKey); }} /></label>}
               <AssetCard
-                key={asset.id}
                 asset={asset}
+                onSelect={bulkMode ? (item) => selectAsset(item.id, false) : undefined}
                 onPreview={(a) => {
                   setPreview(a);
                   setPreviewOpen(true);
@@ -237,6 +272,7 @@ function MediaViewInner({
                 }}
                 onDelete={canDelete ? (a) => setToDelete(a) : undefined}
               />
+              </div>
             ))}
           </div>
           <Pagination
@@ -249,13 +285,17 @@ function MediaViewInner({
           />
         </>
       ) : hasFilters ? (
-        <StatePanel title="No matching media" description="Try a different search or filter." />
+        selectedFolder !== "all" && !state.search && activeKind === "all" ? (
+          <StatePanel title="No files in this folder" description="Upload a file or move files here from the library." />
+        ) : <StatePanel title="No matching media" description="Try a different search or filter." />
       ) : canUpload ? (
         <Dropzone onBrowse={() => inputRef.current?.click()} />
       ) : (
         <StatePanel title="No media yet" description="Files uploaded to the library appear here." />
       )}
 
+      </div>
+      </div>
       {/* full-page drag overlay */}
       {dragging && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-ink/30 backdrop-blur-[1px]">
@@ -303,7 +343,7 @@ function MediaViewInner({
   );
 }
 
-export function MediaView(props: { rows: Asset[]; total: number; params: ListParams }) {
+export function MediaView(props: { rows: Asset[]; total: number; params: ListParams; folders: MediaFolder[] }) {
   // `useDataTable` reads `useSearchParams()`, which requires a Suspense boundary.
   return (
     <Suspense fallback={null}>

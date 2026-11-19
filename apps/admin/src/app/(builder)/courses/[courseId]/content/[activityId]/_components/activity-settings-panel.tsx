@@ -39,6 +39,10 @@ export function ActivitySettingsPanel({
 }: {
   form: UseFormReturn<ActivityFormValues>;
   artwork: {
+    isInsider: boolean;
+    backgroundUrl: string | null;
+    title: string;
+    overlay?: import("@/lib/api/types").ActivitySettings["thumbnailOverlay"];
     courseId: string;
     moduleId: string;
     activityId: string;
@@ -175,10 +179,6 @@ export function ActivitySettingsPanel({
         )}
 
         <ActivityArtwork {...artwork} />
-
-        <SettingRow id="activity-completion" label="Mark complete" hint="Students mark activities complete themselves.">
-          <Input id="activity-completion" value="Manual" readOnly />
-        </SettingRow>
 
         <Field
           id="activity-transcripts"

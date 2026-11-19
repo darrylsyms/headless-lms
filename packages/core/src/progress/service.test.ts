@@ -97,6 +97,7 @@ function activity(id: string, moduleId: string, seq: number, settings: unknown =
     id,
     moduleId,
     courseId: 'c1',
+    parentActivityId: null,
     seq,
     publishedAt: null,
     scheduledAt: null,

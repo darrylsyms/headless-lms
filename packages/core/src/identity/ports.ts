@@ -16,12 +16,15 @@ export interface UpdateProfileInput {
   displayName?: string | null;
   headline?: string | null;
   bio?: string | null;
+  influences?: string[];
+  sharing?: { recent: boolean; saved: boolean };
   imageAssetId?: string | null;
   extra?: JsonValue;
 }
 
 export interface ProfilePatch extends UpdateProfileInput {
   imageAssetOrgId?: string | null;
+  displayNameCooldownSeconds?: number;
 }
 
 export interface UserProvisioner {
@@ -63,6 +66,8 @@ export interface SessionAdmin {
 // Inbound port (use cases the service exposes).
 export interface IdentityService extends UserProvisioner, UserResolver, UserEditor {
   profileOf(actor: MemberActor): Promise<UserProfileView>;
+  stagingCommerceCustomer(actor: MemberActor): Promise<number | null>;
+  consumeStagingSignoutNonce(nonce: string, expiresAt: number, actor: MemberActor): Promise<boolean>;
   displayName(userId: string | null): Promise<string>;
   updateProfile(patch: UpdateProfileInput, actor: MemberActor): Promise<UserProfileView>;
 }
@@ -75,6 +80,9 @@ export interface IdentityRepository {
   findUserByExternalId(externalId: string): Promise<User | null>;
   findUserByEmail(email: string): Promise<User | null>;
   findProfile(userId: string): Promise<UserProfile | null>;
+  findWordPressUsername(userId: string): Promise<string | null>;
+  findStagingCommerceCustomer(userId: string): Promise<number | null>;
+  consumeStagingSignoutNonce(userId: string, nonce: string, expiresAt: number): Promise<boolean>;
   upsertProfile(userId: string, patch: ProfilePatch): Promise<UserProfile>;
 }
 

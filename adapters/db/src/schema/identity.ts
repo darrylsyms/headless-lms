@@ -37,6 +37,22 @@ export const users = pgTable("users", {
     .$onUpdate(() => new Date()),
 });
 
+export const wordpressIdentitySnapshots = pgTable("wordpress_identity_snapshots", {
+  issuer: text("issuer").notNull(),
+  subject: text("subject").notNull(),
+  userId: text("user_id").notNull().references(() => users.id),
+  username: text("username"),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  email: text("email"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [primaryKey({ columns: [table.issuer, table.subject] }), uniqueIndex("wordpress_identity_snapshots_user_idx").on(table.issuer, table.userId)]);
+
+export const profileDisplayNameChanges = pgTable("profile_display_name_changes", {
+  userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  changedAt: timestamp("changed_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const userProfiles = pgTable(
   "user_profiles",
   {

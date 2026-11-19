@@ -14,14 +14,16 @@ export class ProductCourseMappingsRepository {
     return !!course;
   }
 
-  async get(orgId: string, courseId: string): Promise<{ courseId: string; productIds: number[] } | null> {
+  async get(orgId: string, courseId: string): Promise<{ courseId: string; productIds: number[]; primaryProductId?: number | null } | null> {
     const [row] = await this.db.select().from(settings).where(and(
       eq(settings.orgId, orgId), eq(settings.namespace, namespace), eq(settings.scopeId, courseId),
     )).limit(1);
     if (!row) {return null;}
     const productIds = row.value.productIds;
     if (!Array.isArray(productIds) || productIds.some((id) => typeof id !== "number" || !Number.isSafeInteger(id) || id <= 0 || id > 2147483647) || new Set(productIds).size !== productIds.length) {throw new Error("Invalid stored product mapping.");}
-    return { courseId, productIds: productIds as number[] };
+    const primaryProductId = row.value.primaryProductId;
+    if (primaryProductId != null && (typeof primaryProductId !== "number" || !productIds.includes(primaryProductId))) {throw new Error("Invalid stored primary product.");}
+    return { courseId, productIds: productIds as number[], primaryProductId: (primaryProductId as number | null | undefined) ?? null };
   }
 
   async lock(orgId: string, courseId: string): Promise<{ productIds: number[] } | null> {
@@ -42,8 +44,8 @@ export class ProductCourseMappingsRepository {
     return mappings.filter((mapping): mapping is { courseId: string; productIds: number[] } => mapping !== null);
   }
 
-  async replace(orgId: string, mapping: { courseId: string; productIds: number[] }): Promise<void> {
-    await this.db.insert(settings).values({ orgId, namespace, scopeId: mapping.courseId, value: { productIds: mapping.productIds } })
-      .onConflictDoUpdate({ target: [settings.orgId, settings.namespace, settings.scopeId], set: { value: { productIds: mapping.productIds }, updatedAt: new Date() } });
+  async replace(orgId: string, mapping: { courseId: string; productIds: number[]; primaryProductId?: number | null }): Promise<void> {
+    await this.db.insert(settings).values({ orgId, namespace, scopeId: mapping.courseId, value: { productIds: mapping.productIds, primaryProductId: mapping.primaryProductId ?? null } })
+      .onConflictDoUpdate({ target: [settings.orgId, settings.namespace, settings.scopeId], set: { value: { productIds: mapping.productIds, primaryProductId: mapping.primaryProductId ?? null }, updatedAt: new Date() } });
   }
 }

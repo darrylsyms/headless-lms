@@ -1,5 +1,7 @@
 "use client";
 
+import { integrationName } from "../name";
+
 import type { JsonValueInput } from "@headless-lms/sdk";
 
 import { useEffect, useTransition } from "react";
@@ -35,7 +37,7 @@ export function ReconnectDialog({
 
   const integration = row?.integration;
   const connection = row?.connection;
-  const name = integration ? integration.id.charAt(0).toUpperCase() + integration.id.slice(1) : "";
+  const name = integration ? integrationName(integration.id) : "";
 
   // Always starts blank — stored secrets are never echoed back.
   useEffect(() => {

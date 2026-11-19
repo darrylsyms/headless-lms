@@ -1,5 +1,6 @@
 // content context — public surface. Re-export only what other contexts may use.
 export { ContentService } from './service.js';
+export { isPublishedActivity, isPublishedWithParent, publishedActivities } from './activity-visibility.js';
 export { CommunityNotificationCategories } from './notification-categories.js';
 export { ContentItemTitles, activityTitle } from './titles.js';
 export { eventSight, type EventSight } from './event-sight.js';

@@ -27,6 +27,13 @@ export async function memberCommunityRoutes(
   const r = app.withTypeProvider<ZodTypeProvider>();
   const tags = ['Communities'];
 
+  const profileActivity = z.object({ activityId: z.string(), courseId: z.string(), title: z.string(), kind: z.enum(['lesson', 'song', 'insider']), thumbnailUrl: z.string().nullable(), accessible: z.boolean(), viewedAt: z.string().optional() });
+  r.route({
+    method: 'GET', url: '/api/member/communities/:communityId/profiles/:orgUserId', preHandler: app.requireOrgSession,
+    schema: { operationId: 'getCommunityMemberProfile', tags, params: z.object({ communityId: z.string(), orgUserId: z.string() }), response: { 200: z.object({ orgUserId: z.string(), displayName: z.string().nullable(), bio: z.string().nullable(), imageUrl: z.string().nullable(), badge: z.enum(['subscriber', 'student']).nullable(), influences: z.array(z.string()), recent: z.array(profileActivity).nullable(), saved: z.array(profileActivity).nullable() }), ...refusals(403, 404) } },
+    handler: async req => container.reporting.member.communityProfile(req.params.communityId, req.params.orgUserId, await resolveActor(container, req)),
+  });
+
   r.route({
     method: 'GET',
     url: '/api/member/communities/:communityId/home',

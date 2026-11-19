@@ -2,14 +2,11 @@ import type { Actor } from '../shared/actor.js';
 import type { Activity, SubjectRef } from '../types/index.js';
 import type { ContentService, ItemTitle, ItemTitleAccess, ItemTitles } from './ports.js';
 import { eventSight } from './event-sight.js';
+import { isPublishedWithParent } from './activity-visibility.js';
 
 export function activityTitle(activity: Pick<Activity, 'settings'>): string {
   const title = (activity.settings as { title?: unknown } | null)?.title;
   return typeof title === 'string' ? title : '';
-}
-
-function isPublishedActivity(activity: Pick<Activity, 'settings'>): boolean {
-  return (activity.settings as { published?: boolean } | null)?.published !== false;
 }
 
 type TitleReads = Pick<
@@ -66,7 +63,7 @@ export class ContentItemTitles implements ItemTitles {
           return activityTitle(activity);
         }
         const course = await this.deps.content.findCourse(activity.courseId, system);
-        return course && isPublishedActivity(activity) && (await this.opensCourse(actor, course))
+        return course && await isPublishedWithParent(activity, id => this.deps.content.getActivity(id, system)) && (await this.opensCourse(actor, course))
           ? activityTitle(activity)
           : null;
       }

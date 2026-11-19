@@ -22,6 +22,9 @@ export const courseSettingsSchema = z
   .object({
     transcriptDownloads: z.boolean(),
     songLibrary: z.boolean().optional(),
+    lessonBackgroundAssetId: idSchema.nullable().optional(),
+    trailerUrl: z.url({ protocol: /^https$/ }).max(2048).nullable().optional(),
+    bodyDescription: z.string().max(20000).nullable().optional(),
     comments: commentSettingsSchema.optional(),
   })
   .strict();
@@ -131,6 +134,7 @@ export const activitySchema = z
     id: idSchema,
     moduleId: idSchema,
     courseId: idSchema,
+    parentActivityId: idSchema.nullable().default(null),
     seq: z.number().int().min(0),
     publishedAt: z.coerce.date().nullable(),
     scheduledAt: z.coerce.date().nullable(),
@@ -176,6 +180,7 @@ export type ActivityAssetInput = z.input<typeof activityAssetSchema>;
 
 export const saveActivityInputSchema = z
   .object({
+    parentActivityId: idSchema.nullable().optional(),
     settings: jsonValueSchema.optional(),
     publishedAt: z.iso.datetime().optional(),
     scheduledAt: z.iso.datetime().nullable().optional(),

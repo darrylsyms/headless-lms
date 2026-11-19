@@ -2451,6 +2451,7 @@ export type GetCourseProductMappingResponses = {
   200: {
     courseId: string;
     productIds: Array<number>;
+    primaryProductId?: number | null;
   } | null;
 };
 
@@ -2460,6 +2461,7 @@ export type GetCourseProductMappingResponse =
 export type ReplaceCourseProductMappingData = {
   body: {
     productIds: Array<number>;
+    primaryProductId?: number | null;
   };
   path: {
     courseId: string;
@@ -3137,6 +3139,9 @@ export type ListCoursesResponses = {
       settings: {
         transcriptDownloads: boolean;
         songLibrary?: boolean;
+        lessonBackgroundAssetId?: string | null;
+        trailerUrl?: string | null;
+        bodyDescription?: string | null;
         comments?: {
           enabled: boolean;
           threaded: boolean;
@@ -3240,6 +3245,9 @@ export type CreateCourseResponses = {
     settings: {
       transcriptDownloads: boolean;
       songLibrary?: boolean;
+      lessonBackgroundAssetId?: string | null;
+      trailerUrl?: string | null;
+      bodyDescription?: string | null;
       comments?: {
         enabled: boolean;
         threaded: boolean;
@@ -3404,6 +3412,9 @@ export type GetCourseResponses = {
     settings: {
       transcriptDownloads: boolean;
       songLibrary?: boolean;
+      lessonBackgroundAssetId?: string | null;
+      trailerUrl?: string | null;
+      bodyDescription?: string | null;
       comments?: {
         enabled: boolean;
         threaded: boolean;
@@ -3517,6 +3528,9 @@ export type UpdateCourseResponses = {
     settings: {
       transcriptDownloads: boolean;
       songLibrary?: boolean;
+      lessonBackgroundAssetId?: string | null;
+      trailerUrl?: string | null;
+      bodyDescription?: string | null;
       comments?: {
         enabled: boolean;
         threaded: boolean;
@@ -3536,6 +3550,9 @@ export type UpdateCourseSettingsData = {
   body: {
     transcriptDownloads?: boolean;
     songLibrary?: boolean;
+    lessonBackgroundAssetId?: string | null;
+    trailerUrl?: string | null;
+    bodyDescription?: string | null;
     comments?: {
       enabled: boolean;
       threaded: boolean;
@@ -3610,6 +3627,9 @@ export type UpdateCourseSettingsResponses = {
   200: {
     transcriptDownloads: boolean;
     songLibrary?: boolean;
+    lessonBackgroundAssetId?: string | null;
+    trailerUrl?: string | null;
+    bodyDescription?: string | null;
     comments?: {
       enabled: boolean;
       threaded: boolean;
@@ -11412,6 +11432,347 @@ export type GetMemberViewerResponses = {
 
 export type GetMemberViewerResponse = GetMemberViewerResponses[keyof GetMemberViewerResponses];
 
+export type SendMemberSupportRequestData = {
+  body: {
+    message: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/api/member/support";
+};
+
+export type SendMemberSupportRequestErrors = {
+  /**
+   * Default Response
+   */
+  400: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    issues?: Array<{
+      /**
+       * Where in the request, such as `body.topics[1].name`
+       */
+      path: string;
+      message: string;
+    }>;
+  };
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  502: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  503: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    /**
+     * Ids of what the request left behind, such as the post kept as a draft
+     */
+    details?: {
+      [key: string]: string;
+    };
+  };
+};
+
+export type SendMemberSupportRequestError =
+  SendMemberSupportRequestErrors[keyof SendMemberSupportRequestErrors];
+
+export type SendMemberSupportRequestResponses = {
+  /**
+   * Default Response
+   */
+  204: null;
+};
+
+export type SendMemberSupportRequestResponse =
+  SendMemberSupportRequestResponses[keyof SendMemberSupportRequestResponses];
+
+export type ConsumeMemberStagingSignoutNonceData = {
+  body: {
+    nonce: string;
+    expiresAt: number;
+  };
+  path?: never;
+  query?: never;
+  url: "/api/member/profile/staging-signout-nonce";
+};
+
+export type ConsumeMemberStagingSignoutNonceErrors = {
+  /**
+   * Default Response
+   */
+  400: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    issues?: Array<{
+      /**
+       * Where in the request, such as `body.topics[1].name`
+       */
+      path: string;
+      message: string;
+    }>;
+  };
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type ConsumeMemberStagingSignoutNonceError =
+  ConsumeMemberStagingSignoutNonceErrors[keyof ConsumeMemberStagingSignoutNonceErrors];
+
+export type ConsumeMemberStagingSignoutNonceResponses = {
+  /**
+   * Default Response
+   */
+  200: {
+    consumed: boolean;
+  };
+};
+
+export type ConsumeMemberStagingSignoutNonceResponse =
+  ConsumeMemberStagingSignoutNonceResponses[keyof ConsumeMemberStagingSignoutNonceResponses];
+
+export type HandleMemberStagingSignoutChallengeData = {
+  body:
+    | {
+        action: "issue";
+        browserSecret: string;
+        direction: "wordpress-to-lms" | "lms-to-wordpress";
+      }
+    | {
+        action: "consume";
+        browserSecret: string;
+        direction: "wordpress-to-lms" | "lms-to-wordpress";
+        challenge: string;
+      };
+  path?: never;
+  query?: never;
+  url: "/api/member/profile/staging-signout-challenge";
+};
+
+export type HandleMemberStagingSignoutChallengeErrors = {
+  /**
+   * Default Response
+   */
+  400: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    issues?: Array<{
+      /**
+       * Where in the request, such as `body.topics[1].name`
+       */
+      path: string;
+      message: string;
+    }>;
+  };
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  503: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    /**
+     * Ids of what the request left behind, such as the post kept as a draft
+     */
+    details?: {
+      [key: string]: string;
+    };
+  };
+};
+
+export type HandleMemberStagingSignoutChallengeError =
+  HandleMemberStagingSignoutChallengeErrors[keyof HandleMemberStagingSignoutChallengeErrors];
+
+export type HandleMemberStagingSignoutChallengeResponses = {
+  /**
+   * Default Response
+   */
+  200: {
+    challenge: string | null;
+    consumed: boolean;
+  };
+};
+
+export type HandleMemberStagingSignoutChallengeResponse =
+  HandleMemberStagingSignoutChallengeResponses[keyof HandleMemberStagingSignoutChallengeResponses];
+
+export type GetMemberStagingCommerceCustomerData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/api/member/profile/staging-commerce-customer";
+};
+
+export type GetMemberStagingCommerceCustomerErrors = {
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type GetMemberStagingCommerceCustomerError =
+  GetMemberStagingCommerceCustomerErrors[keyof GetMemberStagingCommerceCustomerErrors];
+
+export type GetMemberStagingCommerceCustomerResponses = {
+  /**
+   * Default Response
+   */
+  200: {
+    customerId: number | null;
+  };
+};
+
+export type GetMemberStagingCommerceCustomerResponse =
+  GetMemberStagingCommerceCustomerResponses[keyof GetMemberStagingCommerceCustomerResponses];
+
+export type GetMemberProfileBadgeData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/api/member/profile/badge";
+};
+
+export type GetMemberProfileBadgeErrors = {
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type GetMemberProfileBadgeError =
+  GetMemberProfileBadgeErrors[keyof GetMemberProfileBadgeErrors];
+
+export type GetMemberProfileBadgeResponses = {
+  /**
+   * Default Response
+   */
+  200: {
+    badge: "subscriber" | "student";
+  };
+};
+
+export type GetMemberProfileBadgeResponse =
+  GetMemberProfileBadgeResponses[keyof GetMemberProfileBadgeResponses];
+
 export type GetMemberProfileData = {
   body?: never;
   path?: never;
@@ -11462,6 +11823,7 @@ export type GetMemberProfileResponses = {
     createdAt: string;
     updatedAt: string;
     imageUrl: string | null;
+    username?: string | null;
   };
 };
 
@@ -11472,6 +11834,11 @@ export type UpdateMemberProfileData = {
     displayName?: string | null;
     headline?: string | null;
     bio?: string | null;
+    influences?: Array<string>;
+    sharing?: {
+      recent: boolean;
+      saved: boolean;
+    };
     /**
      * A finalized image you uploaded through `requestMemberUpload`; null clears it
      */
@@ -11526,6 +11893,14 @@ export type UpdateMemberProfileErrors = {
   /**
    * Default Response
    */
+  409: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
   500: {
     error: string;
     message?: string;
@@ -11549,11 +11924,110 @@ export type UpdateMemberProfileResponses = {
     createdAt: string;
     updatedAt: string;
     imageUrl: string | null;
+    username?: string | null;
   };
 };
 
 export type UpdateMemberProfileResponse =
   UpdateMemberProfileResponses[keyof UpdateMemberProfileResponses];
+
+export type GetCommunityMemberProfileData = {
+  body?: never;
+  path: {
+    communityId: string;
+    orgUserId: string;
+  };
+  query?: never;
+  url: "/api/member/communities/{communityId}/profiles/{orgUserId}";
+};
+
+export type GetCommunityMemberProfileErrors = {
+  /**
+   * Default Response
+   */
+  400: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    issues?: Array<{
+      /**
+       * Where in the request, such as `body.topics[1].name`
+       */
+      path: string;
+      message: string;
+    }>;
+  };
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  404: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type GetCommunityMemberProfileError =
+  GetCommunityMemberProfileErrors[keyof GetCommunityMemberProfileErrors];
+
+export type GetCommunityMemberProfileResponses = {
+  /**
+   * Default Response
+   */
+  200: {
+    orgUserId: string;
+    displayName: string | null;
+    bio: string | null;
+    imageUrl: string | null;
+    badge: "subscriber" | "student";
+    influences: Array<string>;
+    recent: Array<{
+      activityId: string;
+      courseId: string;
+      title: string;
+      kind: "lesson" | "song" | "insider";
+      thumbnailUrl: string | null;
+      accessible: boolean;
+      viewedAt?: string;
+    }> | null;
+    saved: Array<{
+      activityId: string;
+      courseId: string;
+      title: string;
+      kind: "lesson" | "song" | "insider";
+      thumbnailUrl: string | null;
+      accessible: boolean;
+      viewedAt?: string;
+    }> | null;
+  };
+};
+
+export type GetCommunityMemberProfileResponse =
+  GetCommunityMemberProfileResponses[keyof GetCommunityMemberProfileResponses];
 
 export type GetMemberCommunityHomeData = {
   body?: never;
@@ -19073,6 +19547,204 @@ export type GetMemberInsiderFeedResponses = {
 export type GetMemberInsiderFeedResponse =
   GetMemberInsiderFeedResponses[keyof GetMemberInsiderFeedResponses];
 
+export type ListMemberCourseCatalogData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/api/member/course-catalog";
+};
+
+export type ListMemberCourseCatalogErrors = {
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type ListMemberCourseCatalogError =
+  ListMemberCourseCatalogErrors[keyof ListMemberCourseCatalogErrors];
+
+export type ListMemberCourseCatalogResponses = {
+  /**
+   * Default Response
+   */
+  200: Array<{
+    orgId: string;
+    id: string;
+    type: "course";
+    title: string;
+    slug: string;
+    description: string;
+    status: "draft" | "published";
+    category: string;
+    difficulty: "all_levels" | "beginner" | "intermediate" | "advanced" | "expert";
+    publishedAt: string | null;
+    scheduledAt: string | null;
+    thumbnailAssetId: string | null;
+    settings: {
+      transcriptDownloads: boolean;
+      songLibrary?: boolean;
+      lessonBackgroundAssetId?: string | null;
+      trailerUrl?: string | null;
+      bodyDescription?: string | null;
+      comments?: {
+        enabled: boolean;
+        threaded: boolean;
+        requireReview: boolean;
+        reactions: boolean;
+      };
+    };
+    createdAt: string;
+    updatedAt: string;
+    thumbnailUrl: string | null;
+  }>;
+};
+
+export type ListMemberCourseCatalogResponse =
+  ListMemberCourseCatalogResponses[keyof ListMemberCourseCatalogResponses];
+
+export type GetMemberCourseCatalogOverviewData = {
+  body?: never;
+  path: {
+    courseId: string;
+  };
+  query?: never;
+  url: "/api/member/course-catalog/{courseId}";
+};
+
+export type GetMemberCourseCatalogOverviewErrors = {
+  /**
+   * Default Response
+   */
+  400: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    issues?: Array<{
+      /**
+       * Where in the request, such as `body.topics[1].name`
+       */
+      path: string;
+      message: string;
+    }>;
+  };
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  404: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type GetMemberCourseCatalogOverviewError =
+  GetMemberCourseCatalogOverviewErrors[keyof GetMemberCourseCatalogOverviewErrors];
+
+export type GetMemberCourseCatalogOverviewResponses = {
+  /**
+   * Default Response
+   */
+  200: {
+    course: {
+      orgId: string;
+      id: string;
+      type: "course";
+      title: string;
+      slug: string;
+      description: string;
+      status: "draft" | "published";
+      category: string;
+      difficulty: "all_levels" | "beginner" | "intermediate" | "advanced" | "expert";
+      publishedAt: string | null;
+      scheduledAt: string | null;
+      thumbnailAssetId: string | null;
+      settings: {
+        transcriptDownloads: boolean;
+        songLibrary?: boolean;
+        lessonBackgroundAssetId?: string | null;
+        trailerUrl?: string | null;
+        bodyDescription?: string | null;
+        comments?: {
+          enabled: boolean;
+          threaded: boolean;
+          requireReview: boolean;
+          reactions: boolean;
+        };
+      };
+      createdAt: string;
+      updatedAt: string;
+      thumbnailUrl: string | null;
+    };
+    modules: Array<{
+      orgId: string;
+      id: string;
+      courseId: string;
+      title: string;
+      description: string | null;
+      seq: number;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+    activities: Array<{
+      id: string;
+      moduleId: string;
+      parentActivityId: string | null;
+      seq: number;
+      title: string;
+    }>;
+    accessible: boolean;
+    primaryProductId?: number | null;
+  };
+};
+
+export type GetMemberCourseCatalogOverviewResponse =
+  GetMemberCourseCatalogOverviewResponses[keyof GetMemberCourseCatalogOverviewResponses];
+
 export type ListMemberCoursesData = {
   body?: never;
   path?: never;
@@ -19129,6 +19801,9 @@ export type ListMemberCoursesResponses = {
     settings: {
       transcriptDownloads: boolean;
       songLibrary?: boolean;
+      lessonBackgroundAssetId?: string | null;
+      trailerUrl?: string | null;
+      bodyDescription?: string | null;
       comments?: {
         enabled: boolean;
         threaded: boolean;
@@ -19226,6 +19901,9 @@ export type GetMemberCourseResponses = {
     settings: {
       transcriptDownloads: boolean;
       songLibrary?: boolean;
+      lessonBackgroundAssetId?: string | null;
+      trailerUrl?: string | null;
+      bodyDescription?: string | null;
       comments?: {
         enabled: boolean;
         threaded: boolean;
@@ -19392,6 +20070,7 @@ export type ListMemberActivitiesResponses = {
     id: string;
     moduleId: string;
     courseId: string;
+    parentActivityId: string | null;
     seq: number;
     publishedAt: string | null;
     scheduledAt: string | null;
@@ -23401,6 +24080,67 @@ export type RemoveMemberEventAttendeeResponses = {
   204: unknown;
 };
 
+export type GetLessonBackgroundData = {
+  body?: never;
+  path: {
+    courseId: string;
+  };
+  query?: never;
+  url: "/api/member/courses/{courseId}/lesson-background";
+};
+
+export type GetLessonBackgroundErrors = {
+  /**
+   * Default Response
+   */
+  400: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    issues?: Array<{
+      /**
+       * Where in the request, such as `body.topics[1].name`
+       */
+      path: string;
+      message: string;
+    }>;
+  };
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  404: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type GetLessonBackgroundError = GetLessonBackgroundErrors[keyof GetLessonBackgroundErrors];
+
 export type GetCourseThumbnailData = {
   body?: never;
   path: {
@@ -26119,6 +26859,7 @@ export type ListActivitiesResponses = {
     id: string;
     moduleId: string;
     courseId: string;
+    parentActivityId: string | null;
     seq: number;
     publishedAt: string | null;
     scheduledAt: string | null;
@@ -26449,6 +27190,10 @@ export type ReorderActivitiesData = {
      * Every id in the collection, in the new order
      */
     orderedIds: Array<string>;
+    /**
+     * Omit for module activities; set to an activity id to reorder its topics
+     */
+    parentActivityId?: string;
   };
   path: {
     courseId: string;
@@ -26541,6 +27286,7 @@ export type MoveActivityData = {
   body: {
     targetModuleId: string;
     position: number;
+    targetParentActivityId?: string;
   };
   path: {
     courseId: string;
@@ -26631,6 +27377,7 @@ export type MoveActivityResponse = MoveActivityResponses[keyof MoveActivityRespo
 
 export type CreateActivityData = {
   body: {
+    parentActivityId?: string | null;
     settings?: JsonValueInput;
     publishedAt?: string;
     scheduledAt?: string | null;
@@ -26805,6 +27552,7 @@ export type DeleteActivityResponse = DeleteActivityResponses[keyof DeleteActivit
 
 export type UpdateActivityData = {
   body: {
+    parentActivityId?: string | null;
     settings?: JsonValueInput;
     publishedAt?: string;
     scheduledAt?: string | null;
@@ -29100,6 +29848,362 @@ export type ListCourseLearnersResponses = {
 export type ListCourseLearnersResponse =
   ListCourseLearnersResponses[keyof ListCourseLearnersResponses];
 
+export type ListMediaFoldersData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/api/media-folders";
+};
+
+export type ListMediaFoldersErrors = {
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type ListMediaFoldersError = ListMediaFoldersErrors[keyof ListMediaFoldersErrors];
+
+export type ListMediaFoldersResponses = {
+  /**
+   * Default Response
+   */
+  200: Array<{
+    id: string;
+    parentId: string | null;
+    name: string;
+  }>;
+};
+
+export type ListMediaFoldersResponse = ListMediaFoldersResponses[keyof ListMediaFoldersResponses];
+
+export type CreateMediaFolderData = {
+  body: {
+    name: string;
+    parentId: string | null;
+  };
+  path?: never;
+  query?: never;
+  url: "/api/media-folders";
+};
+
+export type CreateMediaFolderErrors = {
+  /**
+   * Default Response
+   */
+  400: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    issues?: Array<{
+      /**
+       * Where in the request, such as `body.topics[1].name`
+       */
+      path: string;
+      message: string;
+    }>;
+  };
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  404: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  409: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type CreateMediaFolderError = CreateMediaFolderErrors[keyof CreateMediaFolderErrors];
+
+export type CreateMediaFolderResponses = {
+  /**
+   * Default Response
+   */
+  201: {
+    id: string;
+    parentId: string | null;
+    name: string;
+  };
+};
+
+export type CreateMediaFolderResponse =
+  CreateMediaFolderResponses[keyof CreateMediaFolderResponses];
+
+export type DeleteMediaFolderData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: "/api/media-folders/{id}";
+};
+
+export type DeleteMediaFolderErrors = {
+  /**
+   * Default Response
+   */
+  400: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    issues?: Array<{
+      /**
+       * Where in the request, such as `body.topics[1].name`
+       */
+      path: string;
+      message: string;
+    }>;
+  };
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  404: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type DeleteMediaFolderError = DeleteMediaFolderErrors[keyof DeleteMediaFolderErrors];
+
+export type DeleteMediaFolderResponses = {
+  /**
+   * Default Response
+   */
+  204: unknown;
+};
+
+export type UpdateMediaFolderData = {
+  body: {
+    name?: string;
+    parentId?: string | null;
+  };
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: "/api/media-folders/{id}";
+};
+
+export type UpdateMediaFolderErrors = {
+  /**
+   * Default Response
+   */
+  400: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    issues?: Array<{
+      /**
+       * Where in the request, such as `body.topics[1].name`
+       */
+      path: string;
+      message: string;
+    }>;
+  };
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  404: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  409: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type UpdateMediaFolderError = UpdateMediaFolderErrors[keyof UpdateMediaFolderErrors];
+
+export type UpdateMediaFolderResponses = {
+  /**
+   * Default Response
+   */
+  200: {
+    id: string;
+    parentId: string | null;
+    name: string;
+  };
+};
+
+export type UpdateMediaFolderResponse =
+  UpdateMediaFolderResponses[keyof UpdateMediaFolderResponses];
+
+export type AssignMediaFolderData = {
+  body: {
+    assetIds: Array<string>;
+    folderId: string | null;
+  };
+  path?: never;
+  query?: never;
+  url: "/api/media-folders/assign";
+};
+
+export type AssignMediaFolderErrors = {
+  /**
+   * Default Response
+   */
+  400: {
+    error: string;
+    message?: string;
+    requestId?: string;
+    issues?: Array<{
+      /**
+       * Where in the request, such as `body.topics[1].name`
+       */
+      path: string;
+      message: string;
+    }>;
+  };
+  /**
+   * Default Response
+   */
+  401: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  403: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  404: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+  /**
+   * Default Response
+   */
+  500: {
+    error: string;
+    message?: string;
+    requestId?: string;
+  };
+};
+
+export type AssignMediaFolderError = AssignMediaFolderErrors[keyof AssignMediaFolderErrors];
+
+export type AssignMediaFolderResponses = {
+  /**
+   * Default Response
+   */
+  204: unknown;
+};
+
 export type RequestUploadData = {
   body: {
     filename: string;
@@ -29330,6 +30434,10 @@ export type ListAssetsData = {
      * Only the files uploaded for this content item.
      */
     contentId?: string;
+    /**
+     * A media folder ID, or unfiled.
+     */
+    folderId?: string;
   };
   url: "/api/assets";
 };

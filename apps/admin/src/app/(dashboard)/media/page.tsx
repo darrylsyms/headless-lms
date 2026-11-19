@@ -3,6 +3,7 @@ import { requirePermission } from "@/lib/auth/server-permissions";
 import { parseListParams } from "@/lib/table/parse-list-params";
 
 import { MediaView } from "./media-view";
+import { listMediaFoldersAction } from "./actions";
 
 // Media library page: reads URL params, fetches server-side, renders the media view.
 export default async function MediaPage({
@@ -14,7 +15,7 @@ export default async function MediaPage({
   const sp = await searchParams;
   const params = parseListParams(sp, { pageSize: 24 });
 
-  const { rows, total } = await serverApi.listAssets(params);
+  const [{ rows, total }, folders] = await Promise.all([serverApi.listAssets(params), listMediaFoldersAction()]);
 
-  return <MediaView rows={rows} total={total} params={params} />;
+  return <MediaView rows={rows} total={total} params={params} folders={folders} />;
 }

@@ -45,6 +45,7 @@ import { authorView } from './authors.js';
 import { keepAllowed, mentionTokens, mentionViews } from './mentions.js';
 import { skipsReview, teamBadge } from './rules.js';
 import type { FileUrls } from '../assets/index.js';
+import { isPublishedWithParent } from '../content/index.js';
 
 /** A course with no stored settings. Discussion is opt-in, so the common case
  *  persists no row at all and every existing course stays silent. */
@@ -235,6 +236,9 @@ export class DiscussionServiceImpl implements DiscussionService {
   private async requireActivityOpen(activityId: string, actor: Actor): Promise<Activity> {
     const activity = await this.activityOf(actor.orgId, activityId);
     if (!activity) {
+      throw new NotFoundError('Activity', activityId);
+    }
+    if (activity.parentActivityId && !actor.permissions.has('courses:read', activity.courseId) && !(await isPublishedWithParent(activity, id => this.activityOf(actor.orgId, id)))) {
       throw new NotFoundError('Activity', activityId);
     }
     if (!(await this.opensCourse(actor, activity.courseId))) {
@@ -615,6 +619,9 @@ export class DiscussionServiceImpl implements DiscussionService {
     }
     const activity = await this.activityOf(actor.orgId, this.activityIdOf(comment));
     if (!activity) {
+      throw new NotFoundError('Comment', comment.id);
+    }
+    if (activity.parentActivityId && !actor.permissions.has('courses:read', activity.courseId) && !(await isPublishedWithParent(activity, id => this.activityOf(actor.orgId, id)))) {
       throw new NotFoundError('Comment', comment.id);
     }
     if (!(await this.opensCourse(actor, activity.courseId))) {

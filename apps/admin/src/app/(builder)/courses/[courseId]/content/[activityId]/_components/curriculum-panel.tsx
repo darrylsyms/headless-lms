@@ -51,7 +51,8 @@ export function CurriculumPanel({
                     onClick={onNavigate}
                     aria-current={current ? "page" : undefined}
                     className={cn(
-                      "flex h-8 items-center gap-2 rounded-md pr-2 pl-7 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+                      "flex h-8 items-center gap-2 rounded-md pr-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+                      activity.parentActivityId ? "pl-12" : "pl-7",
                       current ? "bg-selected text-ink" : "text-ink-2 hover:bg-hover hover:text-ink",
                     )}
                   >

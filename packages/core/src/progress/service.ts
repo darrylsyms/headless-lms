@@ -23,15 +23,11 @@ import type {
 import type { ProgressReportItem, ProgressTarget, ReportProgressInput } from './types.js';
 import { progressEvents, type NewProgressEvent } from './events.js';
 import type { Activity, Module } from '../content/index.js';
+import { isPublishedWithParent, publishedActivities } from '../content/index.js';
 import type { Actor } from '../shared/actor.js';
 import type { JsonValue } from '../types/index.js';
 import type { Logger } from '../shared/ports.js';
 import { noopLogger } from '../shared/logger.js';
-
-/** Mirrors reporting/member: `settings.published === false` is the only draft signal. */
-function isActivityPublished(settings: unknown): boolean {
-  return (settings as { published?: boolean } | null)?.published !== false;
-}
 
 /** Fold a report batch into the record's per-subject state map. Reserved keys
  *  (`asset` = subject, `completed` = claim) are stripped; the rest is the asset
@@ -99,14 +95,12 @@ export class ProgressServiceImpl implements ProgressService {
       throw new NotFoundError('Course', courseId);
     }
     const system = this.system.systemActor(actor.orgId);
-    return (await this.content.listCourseActivities(courseId, system)).filter((activity) =>
-      isActivityPublished(activity.settings),
-    );
+    return publishedActivities(await this.content.listCourseActivities(courseId, system));
   }
 
   async recordView(activityId: string, actor: Actor): Promise<void> {
     const activity = await this.content.getActivity(activityId, this.system.systemActor(actor.orgId));
-    if (!activity || !isActivityPublished(activity.settings) || !(await this.canOpenCourse(activity.courseId, actor))) {
+    if (!activity || !(await isPublishedWithParent(activity, id => this.content.getActivity(id, this.system.systemActor(actor.orgId)))) || !(await this.canOpenCourse(activity.courseId, actor))) {
       throw new NotFoundError('Activity', activityId);
     }
     await this.repo.recordView(actor.orgId, actor.id, activityId);
@@ -126,7 +120,7 @@ export class ProgressServiceImpl implements ProgressService {
         return null;
       }
       const settings = activity.settings as { title?: string; published?: boolean } | null;
-      return { activityId: activity.id, courseId: activity.courseId, title: settings?.title?.trim() || 'Untitled activity', kind: activity.courseId === feed?.courseId ? 'insider' as const : course.settings?.songLibrary ? 'song' as const : 'lesson' as const, thumbnailUrl: course.status === 'published' ? course.thumbnailUrl ?? null : null, viewedAt: view.viewedAt.toISOString(), accessible: isActivityPublished(activity.settings) && await this.canOpenCourse(activity.courseId, actor) };
+      return { activityId: activity.id, courseId: activity.courseId, title: settings?.title?.trim() || 'Untitled activity', kind: activity.courseId === feed?.courseId ? 'insider' as const : course.settings?.songLibrary ? 'song' as const : 'lesson' as const, thumbnailUrl: course.status === 'published' ? course.thumbnailUrl ?? null : null, viewedAt: view.viewedAt.toISOString(), accessible: await isPublishedWithParent(activity, id => this.content.getActivity(id, system)) && await this.canOpenCourse(activity.courseId, actor) };
     }));
     return items.filter((item): item is RecentActivityView => item !== null);
   }
@@ -145,7 +139,7 @@ export class ProgressServiceImpl implements ProgressService {
         return null;
       }
       const settings = activity.settings as { title?: string } | null;
-      return { activityId: activity.id, courseId: activity.courseId, title: settings?.title?.trim() || 'Untitled activity', kind: activity.courseId === feed?.courseId ? 'insider' as const : course.settings?.songLibrary ? 'song' as const : 'lesson' as const, thumbnailUrl: course.status === 'published' ? course.thumbnailUrl ?? null : null, accessible: isActivityPublished(activity.settings) && await this.canOpenCourse(activity.courseId, actor) };
+      return { activityId: activity.id, courseId: activity.courseId, title: settings?.title?.trim() || 'Untitled activity', kind: activity.courseId === feed?.courseId ? 'insider' as const : course.settings?.songLibrary ? 'song' as const : 'lesson' as const, thumbnailUrl: course.status === 'published' ? course.thumbnailUrl ?? null : null, accessible: await isPublishedWithParent(activity, parentId => this.content.getActivity(parentId, system)) && await this.canOpenCourse(activity.courseId, actor) };
     }));
     return items.filter((item): item is SavedActivityView => item !== null);
   }
@@ -181,7 +175,7 @@ export class ProgressServiceImpl implements ProgressService {
     const input: Reporter = { ...report, orgUserId: actor.id };
     const system = this.system.systemActor(orgId);
     const activity = await this.content.getActivity(input.activityId, system);
-    if (!activity || !isActivityPublished(activity.settings)) {
+    if (!activity || !(await isPublishedWithParent(activity, id => this.content.getActivity(id, system)))) {
       throw new NotFoundError('Activity', input.activityId);
     }
     const courseId = activity.courseId;
@@ -200,7 +194,7 @@ export class ProgressServiceImpl implements ProgressService {
       // Serializes concurrent reports for this student+course (locks are tx-scoped;
       // both racers lock in the same order, the loser waits and then sees committed state).
       const lockIds = [
-        ...courseActivities.filter((a) => isActivityPublished(a.settings)).map((a) => a.id),
+        ...publishedActivities(courseActivities).map((a) => a.id),
         ...modules.map((m) => m.id),
         courseId,
       ];
@@ -288,7 +282,7 @@ export class ProgressServiceImpl implements ProgressService {
     scope: ProgressWriteScope,
     events: NewProgressEvent[],
   ): Promise<void> {
-    const published = courseActivities.filter((a) => isActivityPublished(a.settings));
+    const published = publishedActivities(courseActivities);
     const byModule = modules.map((m) => ({
       id: m.id,
       activityIds: published.filter((a) => a.moduleId === m.id).map((a) => a.id),

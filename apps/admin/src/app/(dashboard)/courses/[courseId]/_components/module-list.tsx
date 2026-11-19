@@ -31,6 +31,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { RowActions } from "@/components/data-table/row-actions";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -39,7 +40,7 @@ import { activityPublished } from "@/lib/api/compose";
 import { cn } from "@/lib/utils";
 
 import { ActivityIcon, ItemRow } from "./item-row";
-import { activityModule, placeActivity, targetModule } from "./curriculum-drag";
+import { activityModule, placeActivity, placeTopic, targetModule } from "./curriculum-drag";
 import { NewActivityDialog } from "./new-activity-dialog";
 import { EditModuleDialog } from "./edit-module-dialog";
 import {
@@ -63,14 +64,12 @@ const DND_MODIFIERS = [restrictToVerticalAxis];
 const curriculumCollisions: CollisionDetection = (args) => {
   const kind = args.active.data.current?.kind;
   const containers = args.droppableContainers.filter((item) =>
-    kind === "module"
-      ? item.data.current?.kind === "module"
-      : item.data.current?.kind === "module" || item.data.current?.kind === "activity",
+    kind === "module" ? item.data.current?.kind === "module" : kind === "topic" ? item.data.current?.kind === "activity" || item.data.current?.kind === "topic" : item.data.current?.kind === "module" || item.data.current?.kind === "activity",
   );
   const pointer = pointerWithin({ ...args, droppableContainers: containers });
-  if (kind === "activity") {
+  if (kind === "activity" || kind === "topic") {
     const isRow = (id: string | number) =>
-      containers.find((container) => container.id === id)?.data.current?.kind === "activity";
+      ["activity", "topic"].includes(containers.find((container) => container.id === id)?.data.current?.kind);
     const row =
       pointer.find((item) => item.id !== args.active.id && isRow(item.id)) ??
       pointer.find((item) => isRow(item.id));
@@ -78,6 +77,11 @@ const curriculumCollisions: CollisionDetection = (args) => {
   }
   return pointer.length ? pointer : closestCenter({ ...args, droppableContainers: containers });
 };
+
+function TopicList({ items, courseId, moduleId, canEdit, reordering }: { items: ActivityNode[]; courseId: string; moduleId: string; canEdit: boolean; reordering: boolean }) {
+  if (!items.length) return null;
+  return <div className="ml-10 border-l border-line pl-2"><SortableContext items={items.map(item => item.id)} strategy={verticalListSortingStrategy}><div className="flex flex-col gap-0.5">{items.map(item => <ItemRow key={item.id} item={item} courseId={courseId} moduleId={moduleId} canEdit={canEdit} reordering={reordering} />)}</div></SortableContext></div>;
+}
 
 function ActivityDragPreview({ item }: { item: ActivityNode }) {
   const settings = (item.settings ?? {}) as ActivitySettings;
@@ -120,13 +124,16 @@ function SortableModule({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  const items = module.activities;
+  const items = module.activities.filter(item => !item.parentActivityId);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(module.title);
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [descriptionDraft, setDescriptionDraft] = useState(module.description ?? "");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
 
   const [newItemOpen, setNewItemOpen] = useState(false);
+  const [newTopicOpen, setNewTopicOpen] = useState(false);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } =
     useSortable({
@@ -153,6 +160,21 @@ function SortableModule({
     });
   }
 
+  function saveDescription() {
+    const next = descriptionDraft.trim();
+    if (next === (module.description ?? "")) { setEditingDescription(false); return; }
+    startTransition(async () => {
+      try {
+        await updateModuleAction(courseId, module.id, module.title, next || null);
+        setEditingDescription(false);
+        toast.success("Module description updated");
+        router.refresh();
+      } catch (err) {
+        toast.error("Couldn't update description", { description: (err as Error).message });
+      }
+    });
+  }
+
   return (
     <div
       ref={setNodeRef}
@@ -163,7 +185,7 @@ function SortableModule({
         isOver && !isDragging && "border-brand",
       )}
     >
-      <div className="flex items-center gap-3 border-b border-line px-3 py-2.5">
+      <div className="flex items-start gap-3 border-b border-line px-3 py-2.5">
         {canEdit ? (
           <button
             type="button"
@@ -178,10 +200,11 @@ function SortableModule({
           <span className="w-7 shrink-0" aria-hidden />
         )}
 
-        <span className="grid size-6 shrink-0 place-items-center rounded-md bg-surface-2 text-xs font-medium text-ink-3 tabular-nums">
+        <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-md bg-surface-2 text-xs font-medium text-ink-3 tabular-nums">
           {index + 1}
         </span>
 
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
         {editingTitle ? (
           <div className="flex flex-1 items-center gap-1.5">
             <Input
@@ -226,8 +249,23 @@ function SortableModule({
           </button>
         )}
 
-        <span className="shrink-0 text-xs text-ink-4 tabular-nums">
-          {module.activities.length} {module.activities.length === 1 ? "activity" : "activities"}
+          {editingDescription ? (
+            <div className="flex items-start gap-1.5">
+              <Textarea aria-label="Module description" value={descriptionDraft} autoFocus maxLength={1000} onChange={(event) => setDescriptionDraft(event.target.value)} onKeyDown={(event) => {
+                if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); saveDescription(); }
+                if (event.key === "Escape") { setDescriptionDraft(module.description ?? ""); setEditingDescription(false); }
+              }} className="min-h-16" />
+              <Button size="icon-sm" variant="ghost" aria-label="Save description" disabled={isPending} onClick={saveDescription}><Check className="size-4" /></Button>
+              <Button size="icon-sm" variant="ghost" aria-label="Cancel description editing" disabled={isPending} onClick={() => { setDescriptionDraft(module.description ?? ""); setEditingDescription(false); }}><X className="size-4" /></Button>
+            </div>
+          ) : (module.description || canEdit) ? (
+            <button type="button" disabled={!canEdit || isPending} onClick={() => { setDescriptionDraft(module.description ?? ""); setEditingDescription(true); }} className={cn("min-w-0 rounded-md text-left text-sm text-ink-3 outline-none whitespace-pre-wrap break-words", canEdit && "hover:text-brand focus-visible:ring-2 focus-visible:ring-ring/40")}>
+              {module.description || "Add description"}
+            </button>
+          ) : null}
+        </div>
+        <span className="shrink-0 pt-1.5 text-xs text-ink-4 tabular-nums">
+          {items.length} {items.length === 1 ? "activity" : "activities"}
         </span>
 
         {canEdit ? (
@@ -242,10 +280,6 @@ function SortableModule({
         ) : null}
       </div>
 
-      {module.description && (
-        <p className="px-3 pt-3 text-sm text-ink-3">{module.description}</p>
-      )}
-
       <div className="px-2 py-2">
         <SortableContext
           items={items.map((item) => item.id)}
@@ -258,14 +292,17 @@ function SortableModule({
           ) : (
             <div className="flex flex-col gap-0.5">
               {items.map((item) => (
+                <div key={item.id}>
                 <ItemRow
-                  key={item.id}
                   item={item}
                   courseId={courseId}
                   moduleId={module.id}
                   canEdit={canEdit}
                   reordering={reordering}
+                  topicCount={module.activities.filter(topic => topic.parentActivityId === item.id).length}
                 />
+                <TopicList items={module.activities.filter(topic => topic.parentActivityId === item.id)} courseId={courseId} moduleId={module.id} canEdit={canEdit} reordering={reordering} />
+                </div>
               ))}
             </div>
           )}
@@ -277,6 +314,7 @@ function SortableModule({
               <Plus className="size-4" />
               Add activity
             </Button>
+            <Button size="sm" variant="secondary" disabled={!items.length} onClick={() => setNewTopicOpen(true)}><Plus className="size-4" />Add topic</Button>
           </div>
         ) : null}
       </div>
@@ -290,6 +328,7 @@ function SortableModule({
             courseId={courseId}
             moduleId={module.id}
           />
+          <NewActivityDialog open={newTopicOpen} onOpenChange={setNewTopicOpen} courseId={courseId} moduleId={module.id} topicParents={items.map(item => ({ id: item.id, title: ((item.settings ?? {}) as ActivitySettings).title?.trim() || "Untitled activity" }))} />
           <ConfirmDialog
             open={confirmOpen}
             onOpenChange={setConfirmOpen}
@@ -297,8 +336,8 @@ function SortableModule({
             description={
               <>
                 Delete <span className="font-medium text-ink">{module.title}</span> and its{" "}
-                {module.activities.length}{" "}
-                {module.activities.length === 1 ? "activity" : "activities"}? This can&apos;t be
+                {items.length}{" "}
+                {items.length === 1 ? "activity" : "activities"}, including their topics? This can&apos;t be
                 undone.
               </>
             }
@@ -431,7 +470,7 @@ export function ModuleList({
   ): string | null {
     const destination = targetModule(modules, over.id);
     if (!destination || destination.id === over.id) return null;
-    const others = destination.activities.filter((item) => item.id !== activityId);
+    const others = destination.activities.filter((item) => !item.parentActivityId && item.id !== activityId);
     const index = others.findIndex((item) => item.id === over.id);
     if (index < 0) return null;
     const translated = event.active.rect.current.translated;
@@ -449,7 +488,7 @@ export function ModuleList({
     crossedModule.current = false;
     const source = activityModule(orderedRef.current, active.id);
     setDraggedActivity(
-      active.data.current?.kind === "activity"
+      active.data.current?.kind === "activity" || active.data.current?.kind === "topic"
         ? (source?.activities.find((item) => item.id === active.id) ?? null)
         : null,
     );
@@ -511,6 +550,34 @@ export function ModuleList({
       });
       return;
     }
+    if (active.data.current?.kind === "topic") {
+      const source = activityModule(original, active.id);
+      const destination = activityModule(original, over.id);
+      const topic = source?.activities.find(item => item.id === active.id);
+      const target = destination?.activities.find(item => item.id === over.id);
+      if (!source || !destination || !topic?.parentActivityId || !target || active.id === over.id) { updateOrdered(original); return; }
+      const parentId = target.parentActivityId ?? target.id;
+      const siblings = destination.activities.filter(item => item.parentActivityId === parentId && item.id !== topic.id);
+      let before: string | null = null;
+      if (target.parentActivityId) {
+        const targetIndex = siblings.findIndex(item => item.id === target.id);
+        const translated = event.active.rect.current.translated;
+        const pointer = event.activatorEvent instanceof MouseEvent ? event.activatorEvent.clientY + event.delta.y : undefined;
+        const y = pointer ?? (translated ? translated.top + translated.height / 2 : over.rect.top);
+        before = y > over.rect.top + over.rect.height / 2 ? siblings[targetIndex + 1]?.id ?? null : target.id;
+      }
+      const next = placeTopic(original, topic.id, parentId, before);
+      if (next === original) return;
+      const final = activityModule(next, topic.id);
+      if (!final) { updateOrdered(original); return; }
+      const ids = final.activities.filter(item => item.parentActivityId === parentId).map(item => item.id);
+      updateOrdered(next);
+      startTransition(async () => { try {
+        if (topic.parentActivityId === parentId) await reorderActivitiesAction(courseId, source.id, ids, parentId);
+        else await moveActivityAction(courseId, source.id, topic.id, final.id, ids.indexOf(topic.id), parentId);
+      } catch (error) { updateOrdered(original); toast.error("Couldn't move topic", { description: (error as Error).message }); router.refresh(); } });
+      return;
+    }
     const source = activityModule(original, active.id);
     const currentModule = activityModule(current, active.id);
     const destination = targetModule(current, over.id);
@@ -532,8 +599,8 @@ export function ModuleList({
       updateOrdered(original);
       return;
     }
-    const position = finalModule.activities.findIndex((item) => item.id === active.id);
-    const initialPosition = source.activities.findIndex((item) => item.id === active.id);
+    const position = finalModule.activities.filter(item => !item.parentActivityId).findIndex((item) => item.id === active.id);
+    const initialPosition = source.activities.filter(item => !item.parentActivityId).findIndex((item) => item.id === active.id);
     if (source.id === finalModule.id && initialPosition === position) {
       updateOrdered(original);
       return;
@@ -545,7 +612,7 @@ export function ModuleList({
           await reorderActivitiesAction(
             courseId,
             source.id,
-            finalModule.activities.map((item) => item.id),
+            finalModule.activities.filter(item => !item.parentActivityId).map((item) => item.id),
           );
         else
           await moveActivityAction(

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, bigint, timestamp, primaryKey, index } from "drizzle-orm/pg-core";
+import { pgTable, text, bigint, timestamp, primaryKey, index, foreignKey } from "drizzle-orm/pg-core";
 import type { Asset } from "@headless-lms/core/schemas";
 import { genId } from "@headless-lms/core/shared/id";
 import { organizations } from "./organizations.js";
@@ -42,3 +42,35 @@ export const assets = pgTable(
 );
 
 type _AssetsDrift = Expect<NoDrift<typeof assets.$inferSelect, Asset>>;
+
+export const mediaFolders = pgTable(
+  "media_folders",
+  {
+    orgId: text("org_id").notNull().references(() => organizations.id),
+    id: text("id").notNull(),
+    parentId: text("parent_id"),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.orgId, t.id] }),
+    parent: foreignKey({ columns: [t.orgId, t.parentId], foreignColumns: [t.orgId, t.id] }).onDelete("cascade"),
+    parentIdx: index("media_folders_parent_idx").on(t.orgId, t.parentId),
+  }),
+);
+
+export const mediaFolderAssets = pgTable(
+  "media_folder_assets",
+  {
+    orgId: text("org_id").notNull(),
+    assetId: text("asset_id").notNull(),
+    folderId: text("folder_id").notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.orgId, t.assetId] }),
+    asset: foreignKey({ columns: [t.orgId, t.assetId], foreignColumns: [assets.orgId, assets.id] }).onDelete("cascade"),
+    folder: foreignKey({ columns: [t.orgId, t.folderId], foreignColumns: [mediaFolders.orgId, mediaFolders.id] }).onDelete("cascade"),
+    folderIdx: index("media_folder_assets_folder_idx").on(t.orgId, t.folderId),
+  }),
+);

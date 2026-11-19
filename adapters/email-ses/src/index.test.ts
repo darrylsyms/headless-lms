@@ -19,6 +19,13 @@ function fakeClient(error?: Error) {
 }
 
 describe("SesEmailAdapter", () => {
+  it("uses the member's address as Reply-To when provided", async () => {
+    const { commands, client } = fakeClient();
+    const adapter = new SesEmailAdapter({ region: "eu-west-1", from: "support@example.com" }, undefined, client);
+    await adapter.send({ to: "support@example.com", subject: "Help request", text: "Help", replyTo: "member@example.com" });
+    expect(commands[0]?.input.ReplyToAddresses).toEqual(["member@example.com"]);
+    expect(commands[0]?.input.FromEmailAddress).toBe("support@example.com");
+  });
   it("sends a SendEmailCommand with the configured sender and message content", async () => {
     const { commands, client } = fakeClient();
     const adapter = new SesEmailAdapter(

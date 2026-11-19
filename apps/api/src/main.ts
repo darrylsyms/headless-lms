@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { buildServer, closeOnSignals, createContainer } from "@headless-lms/server";
 import { MarkdownBodyParser } from "@headless-lms/adapter-body-markdown";
 import { ResendEmailAdapter } from "@headless-lms/adapter-email-resend";
+import { SesEmailAdapter } from "@headless-lms/adapter-email-ses";
 import { MinioStorageAdapter } from "@headless-lms/adapter-storage-minio";
 import { HatchetAutomationEngine } from "@headless-lms/adapter-workflow-hatchet";
 import { ReactEmailTemplateRenderer } from "@headless-lms/adapter-email-templates";
@@ -12,6 +13,7 @@ import { FileSinkEmailAdapter } from "@headless-lms/adapter-defaults/email";
 import {
   loadEmailConfig,
   loadEmailSinkDir,
+  loadSesEmailConfig,
   loadPushConfig,
   loadServerConfig,
   loadStorageConfig,
@@ -23,8 +25,11 @@ if (process.env.FRETWISE_STAGING_WORDPRESS_SSO === "1") {
 }
 const emailConfig = loadEmailConfig();
 const emailSinkDir = loadEmailSinkDir();
+const sesEmailConfig = emailSinkDir ? undefined : loadSesEmailConfig();
 const pushConfig = loadPushConfig();
 const container = await createContainer(config, {
+  notificationEmailSink: !!emailSinkDir,
+  singleOrganizationEmail: true,
   ...(process.env.FRETWISE_STAGING_WORDPRESS_SSO === "1" ? {
     externalIdentity: async (db) => (await import("../../../adapters/db/staging-wordpress.js")).stagingWordPressIdentity(db),
   } : {}),
@@ -32,7 +37,7 @@ const container = await createContainer(config, {
   adapters: {
     email: emailSinkDir
       ? new FileSinkEmailAdapter(emailSinkDir)
-      : emailConfig && new ResendEmailAdapter(emailConfig),
+      : sesEmailConfig ? new SesEmailAdapter(sesEmailConfig) : emailConfig && new ResendEmailAdapter(emailConfig),
     storage: new MinioStorageAdapter(loadStorageConfig()),
     templates: new ReactEmailTemplateRenderer(),
     workflows: process.env.HATCHET_CLIENT_TOKEN

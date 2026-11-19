@@ -67,6 +67,7 @@ export const assetsQuerySchema = z
     kind: assetKindSchema.optional(),
     source: assetSourceSchema.optional(),
     contentId: idSchema.optional(),
+    folderId: z.string().optional(),
   })
   .strict();
 export type AssetsQuery = z.infer<typeof assetsQuerySchema>;

@@ -201,6 +201,7 @@ function makeActivity(over: Partial<Activity> = {}): Activity {
     id: 'act1',
     moduleId: 'm1',
     courseId: 'c1',
+    parentActivityId: null,
     seq: 0,
     publishedAt: null,
     scheduledAt: null,
@@ -619,6 +620,34 @@ describe('modules', () => {
 });
 
 describe('activities', () => {
+  it('scopes topic reordering to its parent', async () => {
+    const repo = makeRepo();
+    vi.mocked(repo.reorderActivities).mockResolvedValue([makeModule()]);
+    const { svc } = build(repo);
+    await svc.reorderActivities('c1', 'm1', ['topic2', 'topic1'], 'parent', ownerIn('org1'));
+    expect(repo.reorderActivities).toHaveBeenCalledWith('org1', 'c1', 'm1', ['topic2', 'topic1'], 'parent');
+  });
+  it('creates a topic only beneath a top-level activity in the same module', async () => {
+    const repo = makeRepo();
+    vi.mocked(repo.findModule).mockResolvedValue(makeModule());
+    vi.mocked(repo.findActivity).mockResolvedValue(makeActivity({ id: 'parent' }));
+    vi.mocked(repo.saveActivity).mockResolvedValue({ modules: [makeModule()], activity: makeActivity({ id: 'topic', parentActivityId: 'parent', settings: { published: false } }) });
+    const { svc } = build(repo);
+    await svc.saveActivity('c1', 'm1', { parentActivityId: 'parent', settings: { published: false } }, null, ownerIn('org1'));
+    expect(repo.saveActivity).toHaveBeenCalledWith('org1', 'c1', 'm1', expect.objectContaining({ parentActivityId: 'parent' }), undefined);
+    vi.mocked(repo.findActivity).mockResolvedValue(makeActivity({ id: 'parent', parentActivityId: 'other' }));
+    await expect(svc.saveActivity('c1', 'm1', { parentActivityId: 'parent', settings: { published: false } }, null, ownerIn('org1'))).rejects.toThrow('Topics cannot contain topics');
+    vi.mocked(repo.findActivity).mockResolvedValue(makeActivity({ id: 'parent', moduleId: 'other' }));
+    await expect(svc.saveActivity('c1', 'm1', { parentActivityId: 'parent', settings: { published: false } }, null, ownerIn('org1'))).rejects.toThrow(NotFoundError);
+  });
+
+  it('does not silently change the parent of an existing activity', async () => {
+    const repo = makeRepo();
+    vi.mocked(repo.findActivity).mockResolvedValue(makeActivity({ id: 'topic', parentActivityId: 'parent' }));
+    const { svc } = build(repo);
+    await expect(svc.saveActivity('c1', 'm1', { parentActivityId: null }, 'topic', ownerIn('org1'))).rejects.toThrow('Changing an activity parent is not supported');
+    expect(repo.saveActivity).not.toHaveBeenCalled();
+  });
   it('preserves an activity publication date when republished', async () => {
     const repo = makeRepo();
     vi.mocked(repo.findActivity).mockResolvedValue(makeActivity({ settings: { published: false }, publishedAt: AT }));
@@ -953,7 +982,7 @@ describe('activities', () => {
     vi.mocked(repo.reorderActivities).mockResolvedValue(reordered);
 
     const { svc, appended } = build(repo);
-    const result = await svc.reorderActivities('c1', 'm1', ['act2', 'act1'], ownerIn('org1'));
+    const result = await svc.reorderActivities('c1', 'm1', ['act2', 'act1'], undefined, ownerIn('org1'));
 
     expect(result).toBe(reordered);
     expect(appended).toEqual([
@@ -971,8 +1000,8 @@ describe('activities', () => {
     const reordered = [makeModule({ id: 'm1' }), makeModule({ id: 'm2' })];
     vi.mocked(repo.moveActivity).mockResolvedValue(reordered);
     const { svc, appended } = build(repo);
-    expect(await svc.moveActivity('c1', 'm1', 'act1', 'm2', 1, ownerIn('org1'))).toBe(reordered);
-    expect(repo.moveActivity).toHaveBeenCalledWith('org1', 'c1', 'm1', 'act1', 'm2', 1);
+    expect(await svc.moveActivity('c1', 'm1', 'act1', 'm2', 1, undefined, ownerIn('org1'))).toBe(reordered);
+    expect(repo.moveActivity).toHaveBeenCalledWith('org1', 'c1', 'm1', 'act1', 'm2', 1, undefined);
     expect(appended).toHaveLength(2);
     expect(appended.map((event) => event.type)).toEqual([
       'content.course.activities.reordered',

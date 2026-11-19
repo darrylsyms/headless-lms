@@ -10,7 +10,7 @@ import type {
   Logger,
   Page,
 } from "@headless-lms/core/types";
-import { assets } from "../schema/assets.js";
+import { assets, mediaFolderAssets } from "../schema/assets.js";
 import { contentItems } from "../schema/content.js";
 import { noopLogger } from "@headless-lms/core/shared/logger";
 import type { DbExecutor } from "../client.js";
@@ -51,6 +51,7 @@ function referenced(orgId: SQL, assetId: SQL): SQL {
     or exists (select 1 from activity_assets aa where aa.org_id = ${orgId} and aa.asset_id = ${assetId})
     or exists (select 1 from download_assets da where da.org_id = ${orgId} and da.asset_id = ${assetId})
     or exists (select 1 from courses c where c.org_id = ${orgId} and c.thumbnail_asset_id = ${assetId})
+    or exists (select 1 from settings s join courses c on c.org_id = s.org_id and c.id = s.scope_id where s.org_id = ${orgId} and s.namespace = 'content' and s.value->>'lessonBackgroundAssetId' = ${assetId})
     or exists (select 1 from downloads d where d.org_id = ${orgId} and d.thumbnail_asset_id = ${assetId})
     or exists (select 1 from communities c where c.org_id = ${orgId} and c.thumbnail_asset_id = ${assetId})
     or exists (select 1 from event_assets ea where ea.org_id = ${orgId} and ea.asset_id = ${assetId})
@@ -110,6 +111,11 @@ export class DrizzleAssetsRepository implements AssetsRepository {
     }
     if (query.contentId) {
       filters.push(eq(assets.contentId, query.contentId));
+    }
+    if (query.folderId === "unfiled") {
+      filters.push(sql`not exists (select 1 from ${mediaFolderAssets} mfa where mfa.org_id = ${assets.orgId} and mfa.asset_id = ${assets.id})`);
+    } else if (query.folderId) {
+      filters.push(sql`exists (select 1 from ${mediaFolderAssets} mfa where mfa.org_id = ${assets.orgId} and mfa.asset_id = ${assets.id} and mfa.folder_id = ${query.folderId})`);
     }
     const q = query.search?.trim();
     if (q) {

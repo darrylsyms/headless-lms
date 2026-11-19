@@ -8,11 +8,24 @@ import { Content } from "@headless-lms/sdk";
 import { authHeaders } from "@/lib/api/server-call";
 import type { CommentSettings, Course, CourseSettings } from "@/lib/api/types";
 
+export async function setCourseDescriptionsAction(courseId: string, values: { short?: string; body?: string | null }): Promise<void> {
+  if (values.short !== undefined) await Content.updateCourse({ id: courseId, description: values.short }, await authHeaders());
+  if (values.body !== undefined) await Content.updateCourseSettings({ id: courseId, bodyDescription: values.body }, await authHeaders());
+  revalidatePath("/courses/[courseId]/settings", "page");
+  revalidatePath("/courses");
+}
+
 /** Set or clear (null) the course's cover. */
 export async function setCourseThumbnailAction(
   courseId: string,
   thumbnailAssetId: string | null,
-): Promise<Course> {
+  background = false,
+): Promise<Course | void> {
+  if (background) {
+    await Content.updateCourseSettings({ id: courseId, lessonBackgroundAssetId: thumbnailAssetId }, await authHeaders());
+    revalidatePath("/courses/[courseId]/settings", "page");
+    return;
+  }
   const course = await Content.updateCourse(
     { id: courseId, thumbnailAssetId },
     await authHeaders(),
@@ -47,9 +60,9 @@ export async function setSongLibraryAction(courseId: string, songLibrary: boolea
   return settings;
 }
 
-export async function setCourseProductMappingAction(courseId: string, productIds: number[]): Promise<void> {
+export async function setCourseProductMappingAction(courseId: string, productIds: number[], primaryProductId: number | null): Promise<void> {
   const { Integrations } = await import("@headless-lms/sdk");
-  await Integrations.replaceCourseProductMapping({ courseId, productIds }, await authHeaders());
+  await Integrations.replaceCourseProductMapping({ courseId, productIds, primaryProductId }, await authHeaders());
   revalidatePath("/courses/[courseId]/settings", "page");
 }
 

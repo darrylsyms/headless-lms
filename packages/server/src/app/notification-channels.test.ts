@@ -132,6 +132,17 @@ describe('channel registry', () => {
   });
 });
 
+describe('email organisation routing', () => {
+  it('selects the notification organisation at delivery time', async () => {
+    const send = vi.fn();
+    const mailerForOrg = vi.fn().mockResolvedValue({ send });
+    const { channels } = buildNotificationRegistries({ declarations: NOTIFICATION_TYPES, defaults, mailer: { send: vi.fn() }, mailerForOrg, emailOf: async () => 'member@example.com', push: null, channels: [] });
+    await channels.get('email')!.deliver(notification({ orgId: 'org_other' }), { email: 'member@example.com' });
+    expect(mailerForOrg).toHaveBeenCalledWith('org_other');
+    expect(send).toHaveBeenCalledOnce();
+  });
+});
+
 describe('email channel', () => {
   it('addresses the person by their email and renders the template the matched reason selects', async () => {
     const send = vi.fn();

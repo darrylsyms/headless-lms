@@ -61,6 +61,6 @@ export const userProfileSchema = z
 export type UserProfile = z.output<typeof userProfileSchema>;
 
 export const userProfileViewSchema = userProfileSchema
-  .extend({ imageUrl: z.string().nullable() })
+  .extend({ imageUrl: z.string().nullable(), username: z.string().nullable().optional() })
   .strict();
 export type UserProfileView = z.output<typeof userProfileViewSchema>;

@@ -3,6 +3,8 @@ export { ProgressServiceImpl } from './service.js';
 export { progressEvents } from './events.js';
 export type {
   ProgressService,
+  RecentActivityView,
+  SavedActivityView,
   ProgressRepository,
   ProgressUnitOfWork,
   ContentAccessReader,

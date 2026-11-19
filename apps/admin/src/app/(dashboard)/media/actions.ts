@@ -18,7 +18,7 @@ export async function listAssetsAction(
   params: ListParams,
   contentId?: string,
 ): Promise<Paginated<Asset>> {
-  return await Assets.listAssets({ ...toQuery(params, ["kind"]), contentId }, await authHeaders());
+  return await Assets.listAssets({ ...toQuery(params, ["kind", "folderId"]), contentId }, await authHeaders());
 }
 
 export async function deleteAssetAction(id: string): Promise<void> {
@@ -46,4 +46,27 @@ export async function confirmAssetAction(id: string): Promise<Asset> {
   const asset = await Assets.confirmAsset({ id }, await authHeaders());
   revalidatePath("/media");
   return asset;
+}
+
+export type MediaFolder = { id: string; parentId: string | null; name: string };
+export async function listMediaFoldersAction(): Promise<MediaFolder[]> {
+  return await Assets.listMediaFolders(await authHeaders());
+}
+export async function createMediaFolderAction(name: string, parentId: string | null): Promise<MediaFolder> {
+  const folder = await Assets.createMediaFolder({ name, parentId }, await authHeaders());
+  revalidatePath("/media");
+  return folder;
+}
+export async function updateMediaFolderAction(id: string, patch: { name?: string; parentId?: string | null }): Promise<MediaFolder> {
+  const folder = await Assets.updateMediaFolder({ id, ...patch }, await authHeaders());
+  revalidatePath("/media");
+  return folder;
+}
+export async function deleteMediaFolderAction(id: string): Promise<void> {
+  await Assets.deleteMediaFolder({ id }, await authHeaders());
+  revalidatePath("/media");
+}
+export async function assignMediaFolderAction(assetIds: string[], folderId: string | null): Promise<void> {
+  await Assets.assignMediaFolder({ assetIds, folderId }, await authHeaders());
+  revalidatePath("/media");
 }

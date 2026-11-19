@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 export function Field({
   id,
   label,
+  labelAside,
   error,
   hint,
   required,
@@ -17,6 +18,7 @@ export function Field({
 }: {
   id: string;
   label: string;
+  labelAside?: ReactNode;
   error?: string;
   hint?: string;
   required?: boolean;
@@ -25,10 +27,14 @@ export function Field({
 }) {
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
-      <Label htmlFor={id}>
-        {label}
-        {required && <span className="text-danger">*</span>}
-      </Label>
+      {labelAside ? (
+        <div className="flex items-center justify-between gap-2">
+          <Label htmlFor={id}>{label}{required && <span className="text-danger">*</span>}</Label>
+          {labelAside}
+        </div>
+      ) : (
+        <Label htmlFor={id}>{label}{required && <span className="text-danger">*</span>}</Label>
+      )}
       {children}
       {error ? (
         <p className="text-sm text-danger">{error}</p>

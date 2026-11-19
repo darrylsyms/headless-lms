@@ -3,6 +3,7 @@
 // touches process.env.
 import type { ServerConfig, ContainerConfig, PushConfig } from "@headless-lms/server";
 import type { ResendEmailConfig } from "@headless-lms/adapter-email-resend";
+import type { SesEmailConfig } from "@headless-lms/adapter-email-ses";
 import type { MinioStorageConfig } from "@headless-lms/adapter-storage-minio";
 
 /** EMAIL_SINK_DIR wins over RESEND_API_KEY: development writes every email there. */
@@ -17,6 +18,17 @@ export function loadEmailConfig(): ResendEmailConfig | undefined {
     return undefined;
   }
   return { apiKey, from: process.env.EMAIL_FROM ?? "onboarding@resend.dev" };
+}
+
+export function loadSesEmailConfig(): SesEmailConfig | undefined {
+  if (process.env.EMAIL_PROVIDER !== "ses") { return undefined; }
+  const region = process.env.SES_REGION?.trim();
+  const from = process.env.EMAIL_FROM?.trim();
+  const accessKeyId = process.env.SES_ACCESS_KEY;
+  const secretAccessKey = process.env.SES_SECRET_KEY;
+  if (!region || !from) { throw new Error("SES_REGION and EMAIL_FROM are required when EMAIL_PROVIDER is ses."); }
+  if (!!accessKeyId !== !!secretAccessKey) { throw new Error("SES_ACCESS_KEY and SES_SECRET_KEY must be configured together."); }
+  return { region, from, ...(accessKeyId && secretAccessKey ? { accessKeyId, secretAccessKey } : {}), ...(process.env.SES_CONFIGURATION_SET ? { configurationSetName: process.env.SES_CONFIGURATION_SET } : {}) };
 }
 
 function providerEnv(provider: string, names: string[]): Record<string, string> | undefined {

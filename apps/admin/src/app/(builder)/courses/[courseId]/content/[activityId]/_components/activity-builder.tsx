@@ -45,6 +45,7 @@ import { cn } from "@/lib/utils";
 import { calculateLessonDuration, firstContentIndex } from "@/lib/lesson-duration";
 
 import type { BuilderPanel } from "../load-activity";
+import { queueActivitySave } from "./activity-save-queue";
 import { ActivitySettingsPanel } from "./activity-settings-panel";
 import { CurriculumPanel } from "./curriculum-panel";
 import { useAssetPicker } from "./editor-pick-asset";
@@ -128,6 +129,8 @@ export function ActivityBuilder({
   courseTranscriptDownloads,
   courseCommentsEnabled,
   isFeed = false,
+  isInsider,
+  backgroundUrl,
 }: {
   course: { id: string; title: string };
   modules: ModuleTree[];
@@ -140,6 +143,8 @@ export function ActivityBuilder({
   courseTranscriptDownloads: boolean;
   courseCommentsEnabled: boolean;
   isFeed?: boolean;
+  isInsider: boolean;
+  backgroundUrl: string | null;
 }) {
   const router = useRouter();
   const isDesktop = useIsDesktop();
@@ -286,7 +291,7 @@ export function ActivityBuilder({
           patch.lessonDuration = previous;
         }
       }
-      const refusal = await updateActivitySettingsAction(course.id, moduleId, activity.id, patch, changedDate, scheduledAt);
+      const refusal = await queueActivitySave(activity.id, () => updateActivitySettingsAction(course.id, moduleId, activity.id, patch, changedDate, scheduledAt));
       if (refusal) {
         toast.error("Couldn't save activity", { description: refusal.refused });
         return false;
@@ -407,7 +412,7 @@ export function ActivityBuilder({
     return (
       <ActivitySettingsPanel
         form={form}
-        artwork={{ courseId: course.id, moduleId, activityId: activity.id, assetId: ((activity.settings ?? {}) as ActivitySettings).thumbnailAssetId ?? null, url: activity.assetUrls?.[((activity.settings ?? {}) as ActivitySettings).thumbnailAssetId ?? ""] ?? null }}
+        artwork={{ isInsider, backgroundUrl, title: titleOf(activity), overlay: ((activity.settings ?? {}) as ActivitySettings).thumbnailOverlay, courseId: course.id, moduleId, activityId: activity.id, assetId: ((activity.settings ?? {}) as ActivitySettings).thumbnailAssetId ?? null, url: activity.assetUrls?.[((activity.settings ?? {}) as ActivitySettings).thumbnailAssetId ?? ""] ?? null }}
         previouslyPublished={activityPublished((activity.settings ?? {}) as ActivitySettings)}
         hasPublicationDate={Boolean(activity.publishedAt)}
         courseTranscriptDownloads={courseTranscriptDownloads}

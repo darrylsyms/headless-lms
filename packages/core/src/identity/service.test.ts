@@ -37,6 +37,9 @@ function fakeRepo(over?: Partial<IdentityRepository>): IdentityRepository {
     findUserByExternalId: vi.fn().mockResolvedValue(null),
     findUserByEmail: vi.fn().mockResolvedValue(null),
     findProfile: vi.fn().mockResolvedValue(null),
+    findWordPressUsername: vi.fn().mockResolvedValue(null),
+    findStagingCommerceCustomer: vi.fn().mockResolvedValue(null),
+    consumeStagingSignoutNonce: vi.fn().mockResolvedValue(false),
     upsertProfile: vi.fn().mockImplementation((userId, patch) =>
       Promise.resolve({
         userId,
@@ -289,6 +292,7 @@ describe('profileOf', () => {
     expect(profile).toEqual({
       ...stored,
       imageUrl: fileUrls.publicImage('org-1', 'ou_1', 'ast_1'),
+      username: null,
     });
   });
 
@@ -305,6 +309,29 @@ describe('profileOf', () => {
     const profile = await build().service.profileOf(memberOf('usr_invited', 'ou_1', 'org-1'));
 
     expect(profile).toMatchObject({ userId: 'usr_invited', imageAssetId: null, imageUrl: null });
+  });
+
+  it('returns the WordPress username for the signed-in member without replacing their display name', async () => {
+    const repo = fakeRepo({ findProfile: vi.fn().mockResolvedValue(stored), findWordPressUsername: vi.fn().mockResolvedValue('guitarist') });
+    const profile = await build(repo).service.profileOf(memberOf('usr_invited', 'ou_1', 'org-1'));
+    expect(repo.findWordPressUsername).toHaveBeenCalledWith('usr_invited');
+    expect(profile).toMatchObject({ username: 'guitarist', displayName: 'Sarah' });
+  });
+
+  it('returns the WordPress username before a profile has been saved', async () => {
+    const repo = fakeRepo({ findWordPressUsername: vi.fn().mockResolvedValue('guitarist') });
+    const profile = await build(repo).service.profileOf(memberOf('usr_invited', 'ou_1', 'org-1'));
+    expect(profile).toMatchObject({ username: 'guitarist', displayName: null });
+  });
+
+  it('applies the 30-day policy to display-name updates only', async () => {
+    const repo = fakeRepo({ findUserById: vi.fn().mockResolvedValue(PROVISIONED) });
+    const service = build(repo).service;
+    const actor = memberOf('usr_invited', 'ou_1', 'org-1');
+    await service.updateProfile({ displayName: 'Player' }, actor);
+    expect(repo.upsertProfile).toHaveBeenLastCalledWith('usr_invited', expect.objectContaining({ displayName: 'Player', displayNameCooldownSeconds: 30 * 24 * 60 * 60 }));
+    await service.updateProfile({ bio: 'Hello' }, actor);
+    expect(repo.upsertProfile).toHaveBeenLastCalledWith('usr_invited', { bio: 'Hello', imageAssetOrgId: undefined });
   });
 
   it('stores a saved photo under the org of the request and signs it there', async () => {

@@ -109,11 +109,19 @@ export class IdentityServiceImpl implements IdentityService {
     await this.mailer.send(input.email, 'magicLink', { url: input.url });
   }
 
+  async consumeStagingSignoutNonce(nonce: string, expiresAt: number, actor: MemberActor): Promise<boolean> {
+    return this.repo.consumeStagingSignoutNonce(actor.userId, nonce, expiresAt);
+  }
+
+  async stagingCommerceCustomer(actor: MemberActor): Promise<number | null> {
+    return this.repo.findStagingCommerceCustomer(actor.userId);
+  }
+
   async profileOf(actor: MemberActor): Promise<UserProfileView> {
     const userId = actor.userId;
-    const stored = await this.repo.findProfile(userId);
+    const [stored, username] = await Promise.all([this.repo.findProfile(userId), this.repo.findWordPressUsername(userId)]);
     if (stored) {
-      return this.view(actor.orgId, actor.id, stored);
+      return { ...this.view(actor.orgId, actor.id, stored), username };
     }
     const never = new Date(0);
     return {
@@ -124,6 +132,7 @@ export class IdentityServiceImpl implements IdentityService {
       imageAssetOrgId: null,
       imageAssetId: null,
       imageUrl: null,
+      username,
       extra: {},
       createdAt: never,
       updatedAt: never,
@@ -175,7 +184,7 @@ export class IdentityServiceImpl implements IdentityService {
     }
     const imageAssetOrgId =
       patch.imageAssetId === undefined ? undefined : patch.imageAssetId === null ? null : orgId;
-    const profile = await this.repo.upsertProfile(userId, { ...patch, imageAssetOrgId });
+    const profile = await this.repo.upsertProfile(userId, { ...patch, imageAssetOrgId, ...(patch.displayName !== undefined ? { displayNameCooldownSeconds: 30 * 24 * 60 * 60 } : {}) });
     this.logger.info('profile updated', { userId });
     if (patch.imageAssetId !== undefined) {
       await this.images.syncPublicImage(

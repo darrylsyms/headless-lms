@@ -17,6 +17,7 @@ import type { AvailableIntegration, IntegrationConnection } from "@/lib/api/type
 import { formatDate } from "@/lib/format";
 
 import { disconnectIntegrationAction } from "./actions";
+import { integrationName as displayName } from "./name";
 import { ConnectDialog } from "./_components/connect-dialog";
 import { ConfigureDialog } from "./_components/configure-dialog";
 import { ReconnectDialog } from "./_components/reconnect-dialog";
@@ -29,11 +30,6 @@ export interface IntegrationRow {
 function rowStatus(row: IntegrationRow) {
   if (!row.connection) return "not_connected" as const;
   return row.connection.active ? ("connected" as const) : ("inactive" as const);
-}
-
-/** "stripe" → "Stripe" for display; the id stays the identifier everywhere else. */
-function displayName(id: string): string {
-  return id.charAt(0).toUpperCase() + id.slice(1);
 }
 
 // Integrations view (client): rows come in as props; mutations go through

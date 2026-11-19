@@ -38,11 +38,13 @@ export function StudentDetailView({
   entitlements,
   content,
   analytics,
+  profileUrl,
 }: {
   student: Student;
   entitlements: Entitlement[];
   content: LiteContent[];
   analytics: StudentAnalytics;
+  profileUrl?: string;
 }) {
   const permissions = usePermissions();
   const canSeeAccess = permissions.has("access:read");
@@ -126,6 +128,7 @@ export function StudentDetailView({
 
       <StudentHeader
         student={student}
+        profileUrl={profileUrl}
         resending={resending}
         onResendInvite={permissions.has("people:write") ? onResendInvite : undefined}
         onDelete={permissions.has("people:delete") ? () => setConfirmDelete(true) : undefined}
@@ -222,11 +225,13 @@ export function StudentDetailView({
 
 function StudentHeader({
   student,
+  profileUrl,
   resending,
   onResendInvite,
   onDelete,
 }: {
   student: Student;
+  profileUrl?: string;
   resending: boolean;
   onResendInvite?: () => void;
   onDelete?: () => void;
@@ -260,6 +265,7 @@ function StudentHeader({
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          {profileUrl && !pending && <Button asChild variant="secondary" size="sm"><a href={profileUrl} target="_blank" rel="noopener noreferrer">View profile</a></Button>}
           {pending && onResendInvite ? (
             <Button variant="secondary" size="sm" onClick={onResendInvite} disabled={resending}>
               Resend invite

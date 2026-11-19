@@ -76,6 +76,7 @@ export class SesEmailAdapter implements EmailSender {
     const command = new SendEmailCommand({
       FromEmailAddress: this.config.from,
       Destination: { ToAddresses: [message.to] },
+      ...(message.replyTo ? { ReplyToAddresses: [message.replyTo] } : {}),
       ...(this.config.configurationSetName
         ? { ConfigurationSetName: this.config.configurationSetName }
         : {}),

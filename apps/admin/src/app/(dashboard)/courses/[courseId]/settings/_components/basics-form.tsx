@@ -20,7 +20,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { CategoryPicker } from "../../../_components/category-picker";
 import {
   minimumScheduleTime,
@@ -42,7 +41,6 @@ const schema = z.object({
   publishedTime: z.string(),
   scheduleDay: z.string(),
   scheduleTime: z.string(),
-  description: z.string().trim().max(600, "Keep the description under 600 characters"),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -85,7 +83,6 @@ export function BasicsForm({ course, categories }: { course: Course; categories:
       publishedTime: publicationTime(course.publishedAt),
       scheduleDay: publicationDay(course.scheduledAt),
       scheduleTime: publicationTime(course.scheduledAt),
-      description: course.description,
     },
   });
 
@@ -99,7 +96,6 @@ export function BasicsForm({ course, categories }: { course: Course; categories:
       publishedTime: publicationTime(course.publishedAt),
       scheduleDay: publicationDay(course.scheduledAt),
       scheduleTime: publicationTime(course.scheduledAt),
-      description: course.description,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -109,7 +105,6 @@ export function BasicsForm({ course, categories }: { course: Course; categories:
     course.difficulty,
     course.publishedAt,
     course.scheduledAt,
-    course.description,
   ]);
 
   const category = useWatch({ control, name: "category" });
@@ -310,14 +305,6 @@ export function BasicsForm({ course, categories }: { course: Course; categories:
             </Field>
           </div>
         )}
-        <Field
-          id="description"
-          label="Description"
-          hint="A short summary shown on the course card."
-          error={errors.description?.message}
-        >
-          <Textarea id="description" rows={5} {...register("description")} />
-        </Field>
       </SettingsSection>
     </form>
   );

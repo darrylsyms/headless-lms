@@ -13,6 +13,7 @@ import {
   ModulePathParam,
   MoveActivityInput,
   ReorderInput,
+  ReorderActivitiesInput,
   SaveActivity,
   UpdateModule,
   refusals,
@@ -165,7 +166,7 @@ export async function activitiesRoutes(app: FastifyInstance, container: Containe
       summary: 'Reorder the activities in a module',
       description: `Requires \`courses:write\`. Send every activity id of the module once (409 otherwise). Returns the course's modules.`,
       params: ModulePathParam,
-      body: ReorderInput,
+      body: ReorderActivitiesInput,
       response: { 200: ModuleList, ...refusals(403, 404, 409) },
     },
     handler: async (req) => {
@@ -174,6 +175,7 @@ export async function activitiesRoutes(app: FastifyInstance, container: Containe
         req.params.courseId,
         req.params.moduleId,
         req.body.orderedIds,
+        req.body.parentActivityId,
         actor,
       );
     },
@@ -201,6 +203,7 @@ export async function activitiesRoutes(app: FastifyInstance, container: Containe
         req.params.activityId,
         req.body.targetModuleId,
         req.body.position,
+        req.body.targetParentActivityId,
         actor,
       );
     },

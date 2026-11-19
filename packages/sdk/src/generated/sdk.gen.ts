@@ -47,6 +47,8 @@ import type {
   ApprovePostResponses,
   ApproveSpaceRequestErrors,
   ApproveSpaceRequestResponses,
+  AssignMediaFolderErrors,
+  AssignMediaFolderResponses,
   AssignRoleErrors,
   AssignRoleResponses,
   BlockMemberErrors,
@@ -79,6 +81,8 @@ import type {
   ConfirmAssetResponses,
   ConnectIntegrationErrors,
   ConnectIntegrationResponses,
+  ConsumeMemberStagingSignoutNonceErrors,
+  ConsumeMemberStagingSignoutNonceResponses,
   CreateActivityErrors,
   CreateActivityResponses,
   CreateApiKeyErrors,
@@ -97,6 +101,8 @@ import type {
   CreateEventResponses,
   CreateInviteErrors,
   CreateInviteResponses,
+  CreateMediaFolderErrors,
+  CreateMediaFolderResponses,
   CreateMemberEventErrors,
   CreateMemberEventResponses,
   CreateModuleErrors,
@@ -147,6 +153,8 @@ import type {
   DeleteEventResponses,
   DeleteInsiderCategoryErrors,
   DeleteInsiderCategoryResponses,
+  DeleteMediaFolderErrors,
+  DeleteMediaFolderResponses,
   DeleteMemberEventErrors,
   DeleteMemberEventResponses,
   DeleteMemberUploadErrors,
@@ -187,6 +195,8 @@ import type {
   GetCommunityAnalyticsErrors,
   GetCommunityAnalyticsResponses,
   GetCommunityErrors,
+  GetCommunityMemberProfileErrors,
+  GetCommunityMemberProfileResponses,
   GetCommunityMessageQueueErrors,
   GetCommunityMessageQueueResponses,
   GetCommunityNotificationCategoriesErrors,
@@ -226,6 +236,7 @@ import type {
   GetInsiderFeedResponses,
   GetInviteErrors,
   GetInviteResponses,
+  GetLessonBackgroundErrors,
   GetLibraryFileErrors,
   GetMemberChatErrors,
   GetMemberChatResponses,
@@ -237,6 +248,8 @@ import type {
   GetMemberCommunityHomeResponses,
   GetMemberCommunityNotificationSettingsErrors,
   GetMemberCommunityNotificationSettingsResponses,
+  GetMemberCourseCatalogOverviewErrors,
+  GetMemberCourseCatalogOverviewResponses,
   GetMemberCourseErrors,
   GetMemberCourseProgressErrors,
   GetMemberCourseProgressResponses,
@@ -261,12 +274,16 @@ import type {
   GetMemberNotificationUnreadCountsResponses,
   GetMemberOrgErrors,
   GetMemberOrgResponses,
+  GetMemberProfileBadgeErrors,
+  GetMemberProfileBadgeResponses,
   GetMemberProfileErrors,
   GetMemberProfileResponses,
   GetMemberPushConfigErrors,
   GetMemberPushConfigResponses,
   GetMemberSpaceErrors,
   GetMemberSpaceResponses,
+  GetMemberStagingCommerceCustomerErrors,
+  GetMemberStagingCommerceCustomerResponses,
   GetMemberUploadFileErrors,
   GetMemberViewerErrors,
   GetMemberViewerResponses,
@@ -299,6 +316,8 @@ import type {
   GetWebhookSecretResponses,
   GrantEntitlementErrors,
   GrantEntitlementResponses,
+  HandleMemberStagingSignoutChallengeErrors,
+  HandleMemberStagingSignoutChallengeResponses,
   InviteCommunitySpaceMemberErrors,
   InviteCommunitySpaceMemberResponses,
   InviteSpaceMemberErrors,
@@ -376,10 +395,14 @@ import type {
   ListEventsResponses,
   ListInsiderCategoriesErrors,
   ListInsiderCategoriesResponses,
+  ListMediaFoldersErrors,
+  ListMediaFoldersResponses,
   ListMemberActivitiesErrors,
   ListMemberActivitiesResponses,
   ListMemberChatsErrors,
   ListMemberChatsResponses,
+  ListMemberCourseCatalogErrors,
+  ListMemberCourseCatalogResponses,
   ListMemberCoursesErrors,
   ListMemberCoursesResponses,
   ListMemberDevicesErrors,
@@ -574,6 +597,8 @@ import type {
   SendChatMessageResponses,
   SendChatTypingErrors,
   SendChatTypingResponses,
+  SendMemberSupportRequestErrors,
+  SendMemberSupportRequestResponses,
   SetChatSubscriptionErrors,
   SetChatSubscriptionResponses,
   SetCommentReactionErrors,
@@ -641,6 +666,8 @@ import type {
   UpdateDownloadResponses,
   UpdateEventErrors,
   UpdateEventResponses,
+  UpdateMediaFolderErrors,
+  UpdateMediaFolderResponses,
   UpdateMemberEventErrors,
   UpdateMemberEventResponses,
   UpdateMemberProfileErrors,
@@ -2378,6 +2405,7 @@ export class Integrations {
     parameters: {
       courseId: string;
       productIds: Array<number>;
+      primaryProductId?: number | null;
     },
     options?: Options<never, ThrowOnError>,
   ): RequestResult<
@@ -2393,6 +2421,7 @@ export class Integrations {
           args: [
             { in: "path", key: "courseId" },
             { in: "body", key: "productIds" },
+            { in: "body", key: "primaryProductId" },
           ],
         },
       ],
@@ -3123,6 +3152,9 @@ export class Content {
       id: string;
       transcriptDownloads?: boolean;
       songLibrary?: boolean;
+      lessonBackgroundAssetId?: string | null;
+      trailerUrl?: string | null;
+      bodyDescription?: string | null;
       comments?: {
         enabled: boolean;
         threaded: boolean;
@@ -3145,6 +3177,9 @@ export class Content {
             { in: "path", key: "id" },
             { in: "body", key: "transcriptDownloads" },
             { in: "body", key: "songLibrary" },
+            { in: "body", key: "lessonBackgroundAssetId" },
+            { in: "body", key: "trailerUrl" },
+            { in: "body", key: "bodyDescription" },
             { in: "body", key: "comments" },
           ],
         },
@@ -3845,6 +3880,57 @@ export class Content {
   }
 
   /**
+   * List published courses available to explore
+   */
+  public static listMemberCourseCatalog<ThrowOnError extends boolean = false>(
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<
+    ListMemberCourseCatalogResponses,
+    ListMemberCourseCatalogErrors,
+    ThrowOnError,
+    "data"
+  > {
+    return (options?.client ?? client).get<
+      ListMemberCourseCatalogResponses,
+      ListMemberCourseCatalogErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/member/course-catalog",
+      ...options,
+    });
+  }
+
+  /**
+   * Explore a published course and its published curriculum
+   */
+  public static getMemberCourseCatalogOverview<ThrowOnError extends boolean = false>(
+    parameters: {
+      courseId: string;
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<
+    GetMemberCourseCatalogOverviewResponses,
+    GetMemberCourseCatalogOverviewErrors,
+    ThrowOnError,
+    "data"
+  > {
+    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "courseId" }] }]);
+    return (options?.client ?? client).get<
+      GetMemberCourseCatalogOverviewResponses,
+      GetMemberCourseCatalogOverviewErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/member/course-catalog/{courseId}",
+      ...options,
+      ...params,
+    });
+  }
+
+  /**
    * List the courses you can open
    *
    * For a member of the organization. Published courses you hold, directly or through a bundle.
@@ -4237,6 +4323,7 @@ export class Content {
       courseId: string;
       moduleId: string;
       orderedIds: Array<string>;
+      parentActivityId?: string;
     },
     options?: Options<never, ThrowOnError>,
   ): RequestResult<ReorderActivitiesResponses, ReorderActivitiesErrors, ThrowOnError, "data"> {
@@ -4248,6 +4335,7 @@ export class Content {
             { in: "path", key: "courseId" },
             { in: "path", key: "moduleId" },
             { in: "body", key: "orderedIds" },
+            { in: "body", key: "parentActivityId" },
           ],
         },
       ],
@@ -4282,6 +4370,7 @@ export class Content {
       activityId: string;
       targetModuleId: string;
       position: number;
+      targetParentActivityId?: string;
     },
     options?: Options<never, ThrowOnError>,
   ): RequestResult<MoveActivityResponses, MoveActivityErrors, ThrowOnError, "data"> {
@@ -4295,6 +4384,7 @@ export class Content {
             { in: "path", key: "activityId" },
             { in: "body", key: "targetModuleId" },
             { in: "body", key: "position" },
+            { in: "body", key: "targetParentActivityId" },
           ],
         },
       ],
@@ -4326,6 +4416,7 @@ export class Content {
     parameters: {
       courseId: string;
       moduleId: string;
+      parentActivityId?: string | null;
       settings?: JsonValueInput;
       publishedAt?: string;
       scheduledAt?: string | null;
@@ -4340,6 +4431,7 @@ export class Content {
           args: [
             { in: "path", key: "courseId" },
             { in: "path", key: "moduleId" },
+            { in: "body", key: "parentActivityId" },
             { in: "body", key: "settings" },
             { in: "body", key: "publishedAt" },
             { in: "body", key: "scheduledAt" },
@@ -4414,6 +4506,7 @@ export class Content {
       courseId: string;
       moduleId: string;
       activityId: string;
+      parentActivityId?: string | null;
       settings?: JsonValueInput;
       publishedAt?: string;
       scheduledAt?: string | null;
@@ -4429,6 +4522,7 @@ export class Content {
             { in: "path", key: "courseId" },
             { in: "path", key: "moduleId" },
             { in: "path", key: "activityId" },
+            { in: "body", key: "parentActivityId" },
             { in: "body", key: "settings" },
             { in: "body", key: "publishedAt" },
             { in: "body", key: "scheduledAt" },
@@ -6025,6 +6119,42 @@ export class Communities {
     >({
       responseStyle: "data",
       url: "/api/communities/{communityId}/chats/{chatId}/unlock",
+      ...options,
+      ...params,
+    });
+  }
+
+  public static getCommunityMemberProfile<ThrowOnError extends boolean = false>(
+    parameters: {
+      communityId: string;
+      orgUserId: string;
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<
+    GetCommunityMemberProfileResponses,
+    GetCommunityMemberProfileErrors,
+    ThrowOnError,
+    "data"
+  > {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "communityId" },
+            { in: "path", key: "orgUserId" },
+          ],
+        },
+      ],
+    );
+    return (options?.client ?? client).get<
+      GetCommunityMemberProfileResponses,
+      GetCommunityMemberProfileErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/member/communities/{communityId}/profiles/{orgUserId}",
       ...options,
       ...params,
     });
@@ -8001,7 +8131,161 @@ export class Events {
   }
 }
 
+export class Support {
+  public static sendMemberSupportRequest<ThrowOnError extends boolean = false>(
+    parameters: {
+      message: string;
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<
+    SendMemberSupportRequestResponses,
+    SendMemberSupportRequestErrors,
+    ThrowOnError,
+    "data"
+  > {
+    const params = buildClientParams([parameters], [{ args: [{ in: "body", key: "message" }] }]);
+    return (options?.client ?? client).post<
+      SendMemberSupportRequestResponses,
+      SendMemberSupportRequestErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/member/support",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    });
+  }
+}
+
 export class Profile {
+  public static consumeMemberStagingSignoutNonce<ThrowOnError extends boolean = false>(
+    parameters: {
+      nonce: string;
+      expiresAt: number;
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<
+    ConsumeMemberStagingSignoutNonceResponses,
+    ConsumeMemberStagingSignoutNonceErrors,
+    ThrowOnError,
+    "data"
+  > {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "body", key: "nonce" },
+            { in: "body", key: "expiresAt" },
+          ],
+        },
+      ],
+    );
+    return (options?.client ?? client).post<
+      ConsumeMemberStagingSignoutNonceResponses,
+      ConsumeMemberStagingSignoutNonceErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/member/profile/staging-signout-nonce",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    });
+  }
+
+  public static handleMemberStagingSignoutChallenge<ThrowOnError extends boolean = false>(
+    parameters: {
+      body:
+        | {
+            action: "issue";
+            browserSecret: string;
+            direction: "wordpress-to-lms" | "lms-to-wordpress";
+          }
+        | {
+            action: "consume";
+            browserSecret: string;
+            direction: "wordpress-to-lms" | "lms-to-wordpress";
+            challenge: string;
+          };
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<
+    HandleMemberStagingSignoutChallengeResponses,
+    HandleMemberStagingSignoutChallengeErrors,
+    ThrowOnError,
+    "data"
+  > {
+    const params = buildClientParams([parameters], [{ args: [{ key: "body", map: "body" }] }]);
+    return (options?.client ?? client).post<
+      HandleMemberStagingSignoutChallengeResponses,
+      HandleMemberStagingSignoutChallengeErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/member/profile/staging-signout-challenge",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    });
+  }
+
+  public static getMemberStagingCommerceCustomer<ThrowOnError extends boolean = false>(
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<
+    GetMemberStagingCommerceCustomerResponses,
+    GetMemberStagingCommerceCustomerErrors,
+    ThrowOnError,
+    "data"
+  > {
+    return (options?.client ?? client).get<
+      GetMemberStagingCommerceCustomerResponses,
+      GetMemberStagingCommerceCustomerErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/member/profile/staging-commerce-customer",
+      ...options,
+    });
+  }
+
+  public static getMemberProfileBadge<ThrowOnError extends boolean = false>(
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<
+    GetMemberProfileBadgeResponses,
+    GetMemberProfileBadgeErrors,
+    ThrowOnError,
+    "data"
+  > {
+    return (options?.client ?? client).get<
+      GetMemberProfileBadgeResponses,
+      GetMemberProfileBadgeErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/member/profile/badge",
+      ...options,
+    });
+  }
+
   /**
    * Read your profile
    *
@@ -8032,6 +8316,11 @@ export class Profile {
       displayName?: string | null;
       headline?: string | null;
       bio?: string | null;
+      influences?: Array<string>;
+      sharing?: {
+        recent: boolean;
+        saved: boolean;
+      };
       imageAssetId?: string | null;
       extra?: JsonValueInput;
     },
@@ -8045,6 +8334,8 @@ export class Profile {
             { in: "body", key: "displayName" },
             { in: "body", key: "headline" },
             { in: "body", key: "bio" },
+            { in: "body", key: "influences" },
+            { in: "body", key: "sharing" },
             { in: "body", key: "imageAssetId" },
             { in: "body", key: "extra" },
           ],
@@ -10827,6 +11118,151 @@ export class Assets {
     });
   }
 
+  public static listMediaFolders<ThrowOnError extends boolean = false>(
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<ListMediaFoldersResponses, ListMediaFoldersErrors, ThrowOnError, "data"> {
+    return (options?.client ?? client).get<
+      ListMediaFoldersResponses,
+      ListMediaFoldersErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/media-folders",
+      ...options,
+    });
+  }
+
+  public static createMediaFolder<ThrowOnError extends boolean = false>(
+    parameters: {
+      name: string;
+      parentId: string | null;
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<CreateMediaFolderResponses, CreateMediaFolderErrors, ThrowOnError, "data"> {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "body", key: "name" },
+            { in: "body", key: "parentId" },
+          ],
+        },
+      ],
+    );
+    return (options?.client ?? client).post<
+      CreateMediaFolderResponses,
+      CreateMediaFolderErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/media-folders",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    });
+  }
+
+  public static deleteMediaFolder<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string;
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<DeleteMediaFolderResponses, DeleteMediaFolderErrors, ThrowOnError, "data"> {
+    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "id" }] }]);
+    return (options?.client ?? client).delete<
+      DeleteMediaFolderResponses,
+      DeleteMediaFolderErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/media-folders/{id}",
+      ...options,
+      ...params,
+    });
+  }
+
+  public static updateMediaFolder<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string;
+      name?: string;
+      parentId?: string | null;
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<UpdateMediaFolderResponses, UpdateMediaFolderErrors, ThrowOnError, "data"> {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "id" },
+            { in: "body", key: "name" },
+            { in: "body", key: "parentId" },
+          ],
+        },
+      ],
+    );
+    return (options?.client ?? client).patch<
+      UpdateMediaFolderResponses,
+      UpdateMediaFolderErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/media-folders/{id}",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    });
+  }
+
+  public static assignMediaFolder<ThrowOnError extends boolean = false>(
+    parameters: {
+      assetIds: Array<string>;
+      folderId: string | null;
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<AssignMediaFolderResponses, AssignMediaFolderErrors, ThrowOnError, "data"> {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "body", key: "assetIds" },
+            { in: "body", key: "folderId" },
+          ],
+        },
+      ],
+    );
+    return (options?.client ?? client).post<
+      AssignMediaFolderResponses,
+      AssignMediaFolderErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/media-folders/assign",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    });
+  }
+
   /**
    * Register a library asset and get a presigned upload URL
    *
@@ -10909,6 +11345,7 @@ export class Assets {
       kind?: "image" | "video" | "audio" | "document";
       source?: "library" | "member";
       contentId?: string;
+      folderId?: string;
     },
     options?: Options<never, ThrowOnError>,
   ): RequestResult<ListAssetsResponses, ListAssetsErrors, ThrowOnError, "data"> {
@@ -10924,6 +11361,7 @@ export class Assets {
             { in: "query", key: "kind" },
             { in: "query", key: "source" },
             { in: "query", key: "contentId" },
+            { in: "query", key: "folderId" },
           ],
         },
       ],
@@ -11061,6 +11499,26 @@ export class Files {
     return (options?.client ?? client).get<unknown, GetEventFileErrors, ThrowOnError, "data">({
       responseStyle: "data",
       url: "/api/member/events/{eventId}/assets/{assetId}",
+      ...options,
+      ...params,
+    });
+  }
+
+  public static getLessonBackground<ThrowOnError extends boolean = false>(
+    parameters: {
+      courseId: string;
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<unknown, GetLessonBackgroundErrors, ThrowOnError, "data"> {
+    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "courseId" }] }]);
+    return (options?.client ?? client).get<
+      unknown,
+      GetLessonBackgroundErrors,
+      ThrowOnError,
+      "data"
+    >({
+      responseStyle: "data",
+      url: "/api/member/courses/{courseId}/lesson-background",
       ...options,
       ...params,
     });

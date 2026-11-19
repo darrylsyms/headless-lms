@@ -44,6 +44,7 @@ export const AssetsQuery = ListQuery.extend({
   kind: AssetKind.optional(),
   source: AssetSource.optional().describe('Defaults to `library`.'),
   contentId: z.string().optional().describe('Only the files uploaded for this content item.'),
+  folderId: z.string().optional().describe('A media folder ID, or unfiled.'),
 });
 export type AssetsQuery = z.infer<typeof AssetsQuery>;
 

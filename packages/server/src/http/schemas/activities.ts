@@ -23,7 +23,7 @@ export type Module = z.infer<typeof Module>;
 export const ModuleList = z.array(Module);
 export type ModuleList = z.infer<typeof ModuleList>;
 
-/** A course's activities, each with the stable file URLs of the files it links, ordered by (moduleId, seq). */
+/** A course's activities and their stable file URLs, with topics following their parent in sibling order. */
 export const ActivityList = z.array(Activity);
 export type ActivityList = z.infer<typeof ActivityList>;
 
@@ -53,11 +53,15 @@ export type UpdateModule = z.infer<typeof UpdateModule>;
 export const ReorderInput = z.object({
   orderedIds: z.array(idSchema).max(500).describe('Every id in the collection, in the new order'),
 });
+export const ReorderActivitiesInput = ReorderInput.extend({
+  parentActivityId: idSchema.optional().describe('Omit for module activities; set to an activity id to reorder its topics'),
+});
 export type ReorderInput = z.infer<typeof ReorderInput>;
 
 export const MoveActivityInput = z.object({
   targetModuleId: idSchema,
   position: z.number().int().min(0).max(500),
+  targetParentActivityId: idSchema.optional(),
 });
 
 export const SaveActivity = saveActivityInputSchema;

@@ -34,3 +34,5 @@ export type {
   UploadTicket,
   Page,
 } from './model.js';
+export { MediaFoldersService } from './folders.js';
+export type { MediaFolder, MediaFoldersRepository } from './folders.js';

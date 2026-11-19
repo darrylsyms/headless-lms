@@ -33,6 +33,7 @@ export class ResendEmailAdapter implements EmailSender {
         to: message.to,
         subject: message.subject,
         text: message.text,
+        ...(message.replyTo !== undefined && { reply_to: message.replyTo }),
         ...(message.html !== undefined && { html: message.html }),
       }),
     });

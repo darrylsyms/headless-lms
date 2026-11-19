@@ -1,5 +1,7 @@
 import {
   eventSight,
+  publishedActivities,
+  isPublishedWithParent,
   type ContentServicePort,
   type EventSight,
   type EventView,
@@ -39,6 +41,7 @@ import type {
   CommunityHomeLink,
   CommunityHomeSpace,
   CourseProgressView,
+  CourseCatalogOverview,
   CourseView,
   DirectoryEntry,
   DirectoryQuery,
@@ -80,10 +83,6 @@ function itemView(
     : { type: ref.type, id: ref.id, title: found.title };
 }
 
-function isActivityPublished(settings: unknown): boolean {
-  return (settings as { published?: boolean } | null)?.published !== false;
-}
-
 type MemberAccess = Pick<
   EntitlementsService,
   | 'isCommunityMember'
@@ -98,6 +97,7 @@ type MemberAccess = Pick<
 
 type MemberContent = Pick<
   ContentServicePort,
+  | 'listCourses'
   | 'findCourse'
   | 'getInsiderFeed'
   | 'listCourseModules'
@@ -145,6 +145,7 @@ export type MemberReportServiceParams = {
   repo: MemberReportRepository;
   content: MemberContent;
   progress: Pick<ProgressService, 'get' | 'listByTargets'>;
+  activityViews?: Pick<ProgressService, 'listRecentViews' | 'listAllSaved'>;
   files: Pick<AssetFiles, 'signFile' | 'readyFiles'>;
   fileUrls: FileUrls;
   access: MemberAccess;
@@ -158,6 +159,7 @@ export type MemberReportServiceParams = {
   };
   notificationSettings: Pick<NotificationSettingsService, 'get'>;
   channels: Pick<ChannelRegistry, 'list'>;
+  productMappings?: { get(orgId: string, courseId: string): Promise<{ primaryProductId?: number | null } | null> };
   studentPortalUrl: string;
   now?: () => Date;
 };
@@ -166,6 +168,7 @@ export class MemberReportServiceImpl implements MemberReportService {
   private readonly repo: MemberReportRepository;
   private readonly content: MemberContent;
   private readonly progress: Pick<ProgressService, 'get' | 'listByTargets'>;
+  private readonly activityViews: MemberReportServiceParams['activityViews'];
   private readonly files: Pick<AssetFiles, 'signFile' | 'readyFiles'>;
   private readonly fileUrls: FileUrls;
   private readonly access: MemberAccess;
@@ -176,13 +179,16 @@ export class MemberReportServiceImpl implements MemberReportService {
   private readonly notificationCategories: MemberReportServiceParams['notificationCategories'];
   private readonly notificationSettings: Pick<NotificationSettingsService, 'get'>;
   private readonly channels: Pick<ChannelRegistry, 'list'>;
+  private readonly productMappings: MemberReportServiceParams['productMappings'];
   private readonly studentPortalUrl: string;
   private readonly now: () => Date;
 
   constructor(params: MemberReportServiceParams) {
     this.repo = params.repo;
+    this.productMappings = params.productMappings;
     this.content = params.content;
     this.progress = params.progress;
+    this.activityViews = params.activityViews;
     this.files = params.files;
     this.fileUrls = params.fileUrls;
     this.access = params.access;
@@ -407,6 +413,36 @@ export class MemberReportServiceImpl implements MemberReportService {
     return courses.filter((c): c is CourseView => c !== null && c.status === 'published');
   }
 
+  async courseCatalog(actor: Actor): Promise<CourseView[]> {
+    const system = this.system(actor);
+    const feed = await this.content.getInsiderFeed(system);
+    const courses: CourseView[] = [];
+    for (let page = 1; ; page++) {
+      const result = await this.content.listCourses({ page, pageSize: 100, status: 'published' }, system);
+      courses.push(...result.rows.filter(course => course.id !== feed?.courseId && course.status === 'published'));
+      if (!result.rows.length || page * result.pageSize >= result.total) { break; }
+    }
+    return courses;
+  }
+
+  async courseCatalogOverview(courseId: string, actor: Actor): Promise<CourseCatalogOverview> {
+    const system = this.system(actor);
+    const [course, feed] = await Promise.all([this.content.findCourse(courseId, system), this.content.getInsiderFeed(system)]);
+    if (!course || course.status !== 'published' || course.id === feed?.courseId) { throw new NotFoundError('Course', courseId); }
+    const [modules, rows, accessible] = await Promise.all([
+      this.content.listCourseModules(courseId, system),
+      this.content.listCourseActivities(courseId, system),
+      this.opensCourse(courseId, actor),
+    ]);
+    const activities = publishedActivities(rows).map(activity => {
+      const settings = activity.settings;
+      const title = settings && typeof settings === 'object' && !Array.isArray(settings) && typeof settings.title === 'string' ? settings.title.trim() : '';
+      return { id: activity.id, moduleId: activity.moduleId, parentActivityId: activity.parentActivityId, seq: activity.seq, title: title || 'Untitled activity' };
+    });
+    const mapping = await this.productMappings?.get(actor.orgId, courseId);
+    return { course, modules, activities, accessible: !!accessible, primaryProductId: mapping?.primaryProductId ?? null };
+  }
+
   async insiderFeed(actor: Actor): Promise<{ courseId: string; moduleId: string } | null> {
     const feed = await this.content.getInsiderFeed(this.system(actor));
     if (!feed) {
@@ -438,14 +474,14 @@ export class MemberReportServiceImpl implements MemberReportService {
   async listActivities(courseId: string, actor: Actor): Promise<ActivityView[]> {
     await this.requireCourse(courseId, actor);
     const activities = await this.content.listCourseActivityViews(courseId, this.system(actor));
-    return activities.filter((a) => isActivityPublished(a.settings));
+    return publishedActivities(activities);
   }
 
   async courseProgress(courseId: string, actor: Actor): Promise<CourseProgressView> {
     await this.requireCourse(courseId, actor);
     const orgId = actor.orgId;
     const courseActivities = await this.content.listCourseActivities(courseId, this.system(actor));
-    const ids = courseActivities.filter((a) => isActivityPublished(a.settings)).map((a) => a.id);
+    const ids = publishedActivities(courseActivities).map((a) => a.id);
     const records = await this.progress.listByTargets(orgId, actor.id, ids);
     const activities: CourseProgressView['activities'] = {};
     const positions: CourseProgressView['positions'] = {};
@@ -470,7 +506,7 @@ export class MemberReportServiceImpl implements MemberReportService {
     return {
       activities,
       percent: ids.length > 0 ? Math.round((done / ids.length) * 100) : 0,
-      completed: courseRecord?.completedAt != null,
+      completed: courseRecord?.completedAt != null && ids.length > 0 && done === ids.length,
       positions,
     };
   }
@@ -519,6 +555,18 @@ export class MemberReportServiceImpl implements MemberReportService {
     );
   }
 
+  async lessonBackgroundFile(courseId: string, actor: Actor): Promise<string> {
+    let course = await this.opensCourse(courseId, actor);
+    if (!course) {
+      const system = this.system(actor);
+      const [candidate, feed] = await Promise.all([this.content.findCourse(courseId, system), this.content.getInsiderFeed(system)]);
+      if (candidate?.status === 'published' && candidate.id !== feed?.courseId) { course = candidate; }
+    }
+    const assetId = course?.settings?.lessonBackgroundAssetId;
+    if (!assetId) {throw new NotFoundError('Lesson background', courseId);}
+    return signed(await this.files.signFile(actor.orgId, assetId), 'Lesson background', courseId);
+  }
+
   async activityFile(
     activityId: string,
     assetId: string,
@@ -532,7 +580,7 @@ export class MemberReportServiceImpl implements MemberReportService {
     }
     if (!actor.permissions.has('courses:read', activity.courseId)) {
       if (
-        !isActivityPublished(activity.settings) ||
+        !(await isPublishedWithParent(activity, id => this.content.getActivity(id, system))) ||
         !(await this.opensCourse(activity.courseId, actor))
       ) {
         throw new NotFoundError('Lesson file', assetId);
@@ -760,6 +808,36 @@ export class MemberReportServiceImpl implements MemberReportService {
       'Event file',
       assetId,
     );
+  }
+
+  async profileBadge(actor: Actor): Promise<'subscriber' | 'student' | null> {
+    return await this.repo.profileBadge?.(actor.orgId, actor.id) ?? null;
+  }
+
+  async communityProfile(communityId: string, orgUserId: string, actor: Actor) {
+    const staff = actor.permissions.has('people:read') && actor.permissions.has('progress:read');
+    if (!staff && !(await this.access.isCommunityMember(communityId, actor))) { throw new NotFoundError('Community', communityId); }
+    const readers = await this.people.holders(actor.orgId, 'communities:read', communityId);
+    const person = await this.repo.profilePerson?.(actor.orgId, communityId, orgUserId, readers, staff);
+    if (!person) { throw new NotFoundError('Member', orgUserId); }
+    const extra = person.extra && typeof person.extra === 'object' && !Array.isArray(person.extra) ? person.extra as Record<string, unknown> : {};
+    const sharing = extra.sharing && typeof extra.sharing === 'object' && !Array.isArray(extra.sharing) ? extra.sharing as Record<string, unknown> : {};
+    const influences = Array.isArray(extra.influences) ? extra.influences.filter((value): value is string => typeof value === 'string').slice(0, 30) : [];
+    const owner = actor.id === orgUserId;
+    const showRecent = staff || owner || sharing.recent !== false;
+    const showSaved = staff || owner || sharing.saved !== false;
+    const subject = { ...actor, id: orgUserId };
+    const [recentRows, savedRows] = await Promise.all([
+      showRecent && this.activityViews ? this.activityViews.listRecentViews(subject) : Promise.resolve(null),
+      showSaved && this.activityViews ? this.activityViews.listAllSaved(subject) : Promise.resolve(null),
+    ]);
+    const visible = async <T extends { courseId: string; kind: 'lesson' | 'song' | 'insider'; accessible: boolean }>(rows: T[] | null): Promise<T[] | null> => {
+      if (!rows) { return null; }
+      const checks = await Promise.all(rows.map(row => row.accessible && this.opensCourse(row.courseId, actor)));
+      return rows.flatMap((row, index) => !row.accessible || (row.kind === 'insider' && !checks[index]) ? [] : [{ ...row, accessible: !!checks[index] }]);
+    };
+    const badge = await this.repo.profileBadge?.(actor.orgId, orgUserId) ?? null;
+    return { orgUserId, displayName: person.displayName, bio: person.bio, imageUrl: person.imageAssetId ? this.fileUrls.publicImage(actor.orgId, orgUserId, person.imageAssetId) : null, badge, influences, recent: await visible(recentRows), saved: await visible(savedRows) };
   }
 
   async directory(

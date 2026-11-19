@@ -38,6 +38,17 @@ export async function memberFileRoutes(app: FastifyInstance, container: Containe
 
   r.route({
     method: 'GET',
+    url: '/api/member/courses/:courseId/lesson-background',
+    preHandler: app.requireOrgSession,
+    schema: { operationId: 'getLessonBackground', tags, params: CourseThumbnailParams, response: responses },
+    handler: async (req, reply) => {
+      const actor = await resolveActor(container, req);
+      return redirect(reply, await member.lessonBackgroundFile(req.params.courseId, actor));
+    },
+  });
+
+  r.route({
+    method: 'GET',
     url: '/api/member/courses/:courseId/thumbnail',
     preHandler: app.requireOrgSession,
     schema: {

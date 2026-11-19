@@ -5,6 +5,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { provisionVerifiedStagingIdentity } from "./staging-identity-provision.js";
 import { verifyStagingIdentity } from "./staging-verified-identity.js";
 import { stagingTestCustomer } from "./staging-test-customer.js";
+import { readStagingWordPressProfile, storeStagingWordPressProfile } from "./staging-wordpress-profile.js";
 
 const issuer = "https://getfretwise-cydd.1wp.site/wenisch-tech/keystone-oidc";
 const providerId = "fretwise-wordpress-staging";
@@ -29,21 +30,28 @@ export async function stagingWordPressIdentity(db: NodePgDatabase) {
   const josePath = createRequire(authRequire.resolve("better-auth")).resolve("jose");
   const { createRemoteJWKSet, decodeJwt } = await import(pathToFileURL(josePath).href);
   const keys = createRemoteJWKSet(new URL(String(metadata.jwks_uri)));
+  const profileSync = process.env.FRETWISE_STAGING_WORDPRESS_PROFILE_SYNC === "1";
   return {
     providerId, clientId, clientSecret, discoveryUrl,
     redirectURI: "http://localhost:8017/callback",
-    scopes: ["openid"],
-    getUserInfo: async (tokens: { idToken?: string }) => {
+    scopes: profileSync ? ["openid", "profile", "email"] : ["openid"],
+    getUserInfo: async (tokens: { idToken?: string; accessToken?: string }) => {
       if (!tokens.idToken) {return null;}
       const payload = decodeJwt(tokens.idToken);
       if (typeof payload.nonce !== "string") {return null;}
       const verified = await verifyStagingIdentity(tokens.idToken, keys, clientId, payload.nonce);
+      const profile = profileSync ? await readStagingWordPressProfile(tokens.accessToken ?? "", verified.subject) : null;
       const fixtureEmail = stagingTestCustomer(verified.subject)?.fixtureEmail;
       const stagingIdentity = fixtureEmail && !verified.email
         ? { ...verified, email: fixtureEmail, name: "Fretwise staging test" }
         : verified;
       const result = await db.transaction(async (tx) => {
         const member = await provisionVerifiedStagingIdentity(tx, stagingIdentity);
+        if (profile) {
+          const people = await tx.execute(sql`select id from users where external_id = ${member.authUserId}`);
+          if (people.rows.length !== 1 || typeof people.rows[0]!.id !== "string") throw new Error("The staging person is unavailable.");
+          await storeStagingWordPressProfile(tx, people.rows[0]!.id, profile);
+        }
         const users = await tx.execute(sql`select email, name from ba_user where id = ${member.authUserId}`);
         if (member.orgId !== orgId || users.rows.length !== 1) {throw new Error("The staging member is unavailable.");}
         return { email: String(users.rows[0]!.email), name: String(users.rows[0]!.name) };

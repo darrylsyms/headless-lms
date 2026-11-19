@@ -21,6 +21,34 @@ export async function assetsRoutes(app: FastifyInstance, container: Container): 
   const assets = container.assets;
   const tags = ['Assets'];
 
+  const Folder = z.object({ id: z.string(), parentId: z.string().nullable(), name: z.string() });
+  const FolderId = z.object({ id: z.string() });
+  r.route({
+    method: 'GET', url: '/api/media-folders',
+    schema: { operationId: 'listMediaFolders', tags, response: { 200: z.array(Folder), ...refusals(403) } },
+    handler: async req => container.mediaFolders.list(await resolveActor(container, req)),
+  });
+  r.route({
+    method: 'POST', url: '/api/media-folders',
+    schema: { operationId: 'createMediaFolder', tags, body: z.object({ name: z.string().trim().min(1).max(100), parentId: z.string().nullable() }), response: { 201: Folder, ...refusals(400, 403, 404, 409) } },
+    handler: async (req, reply) => reply.code(201).send(await container.mediaFolders.create(req.body, await resolveActor(container, req))),
+  });
+  r.route({
+    method: 'PATCH', url: '/api/media-folders/:id',
+    schema: { operationId: 'updateMediaFolder', tags, params: FolderId, body: z.object({ name: z.string().trim().min(1).max(100).optional(), parentId: z.string().nullable().optional() }), response: { 200: Folder, ...refusals(400, 403, 404, 409) } },
+    handler: async req => container.mediaFolders.update(req.params.id, req.body, await resolveActor(container, req)),
+  });
+  r.route({
+    method: 'DELETE', url: '/api/media-folders/:id',
+    schema: { operationId: 'deleteMediaFolder', tags, params: FolderId, response: { 204: z.void(), ...refusals(403, 404) } },
+    handler: async (req, reply) => { await container.mediaFolders.remove(req.params.id, await resolveActor(container, req)); return reply.code(204).send(); },
+  });
+  r.route({
+    method: 'POST', url: '/api/media-folders/assign',
+    schema: { operationId: 'assignMediaFolder', tags, body: z.object({ assetIds: z.array(z.string()).min(1).max(200), folderId: z.string().nullable() }), response: { 204: z.void(), ...refusals(400, 403, 404) } },
+    handler: async (req, reply) => { await container.mediaFolders.assign(req.body, await resolveActor(container, req)); return reply.code(204).send(); },
+  });
+
   r.route({
     method: 'POST',
     url: '/api/uploads',

@@ -5,6 +5,7 @@ import type {
   CommunityHome,
   CommunityHomeSpace,
   CourseProgressView,
+  CourseCatalogOverview,
   CourseView,
   DirectoryEntry,
   DirectoryQuery,
@@ -30,9 +31,13 @@ import type { MemberActor } from '../../identity/index.js';
 import type { EventFaces } from '../events/index.js';
 
 export interface MemberReportService {
+  profileBadge(actor: Actor): Promise<'subscriber' | 'student' | null>;
+  communityProfile(communityId: string, orgUserId: string, actor: Actor): Promise<{ orgUserId: string; displayName: string | null; bio: string | null; imageUrl: string | null; badge: 'subscriber' | 'student' | null; influences: string[]; recent: import('../../progress/index.js').RecentActivityView[] | null; saved: import('../../progress/index.js').SavedActivityView[] | null }>;
   /** Who the caller is in the org, and the permissions they hold. */
   viewer(actor: Actor): MemberViewer;
   listCourses(actor: Actor): Promise<CourseView[]>;
+  courseCatalog(actor: Actor): Promise<CourseView[]>;
+  courseCatalogOverview(courseId: string, actor: Actor): Promise<CourseCatalogOverview>;
   insiderFeed(actor: Actor): Promise<{ courseId: string; moduleId: string } | null>;
   getCourse(courseId: string, actor: Actor): Promise<CourseView>;
   listModules(courseId: string, actor: Actor): Promise<Module[]>;
@@ -50,6 +55,7 @@ export interface MemberReportService {
     id: string,
     actor: Actor,
   ): Promise<string>;
+  lessonBackgroundFile(courseId: string, actor: Actor): Promise<string>;
   getEvent(eventId: string, actor: Actor): Promise<MemberEvent>;
   listEvents(query: MemberEventsQuery, actor: Actor): Promise<Page<MemberEventSummary>>;
   eventCalendar(eventId: string, actor: Actor): Promise<string>;
@@ -92,6 +98,8 @@ export interface MemberReportService {
 }
 
 export interface MemberReportRepository {
+  profilePerson?(orgId: string, communityId: string, orgUserId: string, readers: string[], staff: boolean): Promise<(DirectoryRow & { extra: unknown }) | null>;
+  profileBadge?(orgId: string, orgUserId: string): Promise<'subscriber' | 'student' | null>;
   directory(
     orgId: string,
     communityId: string,

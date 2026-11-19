@@ -130,6 +130,7 @@ export interface ActivitySettings {
   category?: string;
   difficulty?: "all_levels" | "beginner" | "intermediate" | "advanced" | "expert";
   thumbnailAssetId?: string | null;
+  thumbnailOverlay?: { enabled: boolean; text: string; layout: "left" | "center" | "top" | "bottom"; textWidth?: number | null };
   lessonDuration?: { kind: "video" | "written"; minutes: number | null; basis?: "video" | "notes" };
   title?: string;
   body?: string;
@@ -153,6 +154,7 @@ export type ActivityCommentsRule = "inherit" | "always" | "never";
  */
 export interface SaveActivityInput {
   id?: string;
+  parentActivityId?: string | null;
   settings?: unknown;
   assetIds?: string[];
 }

@@ -1,3 +1,5 @@
+import { Content } from "@headless-lms/sdk";
+import { API_URL, authHeaders } from "@/lib/api/server-call";
 import editorModule from "@/editor.config";
 import { ForbiddenView } from "@/components/full-page-states";
 import { courseSettingsOf } from "@/lib/api/compose";
@@ -27,11 +29,14 @@ export default async function ActivityBuilderPage({
       ? stored
       : null;
   const courseSettings = courseSettingsOf(course);
+  const insider = await Content.getInsiderFeed(await authHeaders()).catch(() => null);
 
   return (
     <ActivityBuilder
       key={activity.id}
       isFeed={feed === "1"}
+      isInsider={insider?.courseId === course.id}
+      backgroundUrl={courseSettings.lessonBackgroundAssetId ? `${API_URL}/api/member/courses/${encodeURIComponent(course.id)}/lesson-background` : null}
       course={{ id: course.id, title: course.title }}
       modules={modules}
       moduleId={parent.id}

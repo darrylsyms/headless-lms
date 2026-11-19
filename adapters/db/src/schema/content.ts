@@ -8,6 +8,7 @@ import {
   foreignKey,
   unique,
   index,
+  uniqueIndex,
   check,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
@@ -215,6 +216,7 @@ export const activities = pgTable(
     // for far more often than its module (progress, discussion, entitlements),
     // and the FK below pins the pair, so it cannot disagree with the module.
     courseId: text("course_id").notNull(),
+    parentActivityId: text("parent_activity_id"),
     seq: integer("seq").notNull(),
     // Opaque per-activity blob: title, type, body, completion rule — whatever the
     // content needs. Assets are the one thing kept out of the blob.
@@ -236,7 +238,10 @@ export const activities = pgTable(
       columns: [t.orgId, t.moduleId, t.courseId],
       foreignColumns: [modules.orgId, modules.id, modules.courseId],
     }).onDelete("cascade"),
-    seqUq: unique().on(t.orgId, t.moduleId, t.seq),
+    parentFk: foreignKey({ columns: [t.orgId, t.parentActivityId], foreignColumns: [t.orgId, t.id] }).onDelete("cascade"),
+    noSelfParent: check("activities_no_self_parent", sql`${t.parentActivityId} is null or ${t.parentActivityId} <> ${t.id}`),
+    topLevelSeqUq: uniqueIndex("activities_top_level_seq_uq").on(t.orgId, t.moduleId, t.seq).where(sql`${t.parentActivityId} is null`),
+    topicSeqUq: uniqueIndex("activities_topic_seq_uq").on(t.orgId, t.parentActivityId, t.seq).where(sql`${t.parentActivityId} is not null`),
     scheduledIdx: index("activities_scheduled_idx").on(t.scheduledAt).where(sql`${t.scheduledAt} is not null`),
   }),
 );

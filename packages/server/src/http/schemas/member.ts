@@ -12,6 +12,14 @@ import { permissionSchema } from '@headless-lms/core/schemas';
 export const MemberCourses = z.array(Course);
 export type MemberCourses = z.infer<typeof MemberCourses>;
 
+export const CourseCatalogOverview = z.object({
+  course: Course,
+  modules: z.array(Module),
+  activities: z.array(z.object({ id: z.string(), moduleId: z.string(), parentActivityId: z.string().nullable(), seq: z.number().int(), title: z.string() })),
+  accessible: z.boolean(),
+  primaryProductId: z.number().int().positive().nullable().optional(),
+});
+
 /** One enrolled course's module→activity tree (published activities only). */
 export const MemberModules = z.array(Module);
 export type MemberModules = z.infer<typeof MemberModules>;

@@ -12,6 +12,7 @@ import {
   ilike,
   or,
   inArray,
+  isNull,
   gt,
   lt,
   lte,
@@ -496,11 +497,20 @@ export class DrizzleContentRepository implements ContentRepository {
   }
 
   async listActivitiesForCourse(orgId: string, courseId: string): Promise<Activity[]> {
-    return this.db
+    const rows = await this.db
       .select()
       .from(activities)
       .where(and(eq(activities.orgId, orgId), eq(activities.courseId, courseId)))
       .orderBy(activities.moduleId, activities.seq);
+    const topics = new Map<string, Activity[]>();
+    for (const row of rows) {
+      if (row.parentActivityId) {
+        const siblings = topics.get(row.parentActivityId) ?? [];
+        siblings.push(row);
+        topics.set(row.parentActivityId, siblings);
+      }
+    }
+    return rows.filter(row => !row.parentActivityId).flatMap(row => [row, ...(topics.get(row.id) ?? [])]);
   }
 
   // Bare join-table rows; the activities join only scopes them to the course.
@@ -567,7 +577,8 @@ export class DrizzleContentRepository implements ContentRepository {
       .where(
         and(eq(modules.orgId, orgId), eq(modules.id, moduleId), eq(modules.courseId, courseId)),
       )
-      .limit(1);
+      .limit(1)
+      .for("update");
     if (!row) {
       throw new NotFoundError("Module", moduleId);
     }
@@ -682,9 +693,17 @@ export class DrizzleContentRepository implements ContentRepository {
     courseId: string,
     moduleId: string,
     orderedIds: string[],
+    parentActivityId?: string,
   ): Promise<Module[]> {
     return this.tx(async (tx) => {
       await this.assertModule(tx, orgId, courseId, moduleId);
+      const scope = parentActivityId ? eq(activities.parentActivityId, parentActivityId) : isNull(activities.parentActivityId);
+      if (parentActivityId) {
+        const [parent] = await tx.select().from(activities).where(and(eq(activities.orgId, orgId), eq(activities.id, parentActivityId), eq(activities.moduleId, moduleId), eq(activities.courseId, courseId), isNull(activities.parentActivityId))).for("update");
+        if (!parent) { throw new NotFoundError("Activity", parentActivityId); }
+      }
+      const siblings = await tx.select({ id: activities.id }).from(activities).where(and(eq(activities.orgId, orgId), eq(activities.moduleId, moduleId), scope)).for("update");
+      if (orderedIds.length !== siblings.length || new Set(orderedIds).size !== siblings.length || siblings.some(row => !orderedIds.includes(row.id))) { throw new ConflictError("Provide every activity in the collection once"); }
       // Two-phase to dodge the unique(org_id, module_id, seq) constraint mid-swap:
       // park rows at negative seqs, then assign the final 0..n-1.
       for (let i = 0; i < orderedIds.length; i++) {
@@ -695,6 +714,7 @@ export class DrizzleContentRepository implements ContentRepository {
             and(
               eq(activities.orgId, orgId),
               eq(activities.moduleId, moduleId),
+              scope,
               eq(activities.id, orderedIds[i]!),
             ),
           );
@@ -707,6 +727,7 @@ export class DrizzleContentRepository implements ContentRepository {
             and(
               eq(activities.orgId, orgId),
               eq(activities.moduleId, moduleId),
+              scope,
               eq(activities.id, orderedIds[i]!),
             ),
           );
@@ -722,6 +743,7 @@ export class DrizzleContentRepository implements ContentRepository {
     activityId: string,
     targetModuleId: string,
     position: number,
+    targetParentActivityId?: string,
   ): Promise<Module[]> {
     return this.tx(async (tx) => {
       const moduleIds = [moduleId, targetModuleId].sort();
@@ -741,6 +763,23 @@ export class DrizzleContentRepository implements ContentRepository {
         {throw new NotFoundError("Module", moduleId);}
       if (!locked.some((module) => module.id === targetModuleId))
         {throw new NotFoundError("Module", targetModuleId);}
+      if (targetParentActivityId) {
+        const [source] = await tx.select().from(activities).where(and(eq(activities.orgId, orgId), eq(activities.courseId, courseId), eq(activities.moduleId, moduleId), eq(activities.id, activityId))).for("update");
+        const [target] = await tx.select().from(activities).where(and(eq(activities.orgId, orgId), eq(activities.courseId, courseId), eq(activities.moduleId, targetModuleId), eq(activities.id, targetParentActivityId), isNull(activities.parentActivityId))).for("update");
+        if (!source || !source.parentActivityId) { throw new NotFoundError("Topic", activityId); }
+        if (!target) { throw new NotFoundError("Activity", targetParentActivityId); }
+        if (source.parentActivityId === targetParentActivityId) { throw new ConflictError("Use reorder to move within an activity"); }
+        const rows = await tx.select({ id: activities.id, parentActivityId: activities.parentActivityId }).from(activities).where(and(eq(activities.orgId, orgId), inArray(activities.parentActivityId, [source.parentActivityId, targetParentActivityId]))).orderBy(asc(activities.seq)).for("update");
+        const from = rows.filter(row => row.parentActivityId === source.parentActivityId).map(row => row.id);
+        const to = rows.filter(row => row.parentActivityId === targetParentActivityId).map(row => row.id);
+        if (!Number.isInteger(position) || position < 0 || position > to.length) { throw new ConflictError("The destination position is no longer valid"); }
+        for (const ids of [from, to]) { for (let i = 0; i < ids.length; i++) { await tx.update(activities).set({ seq: -(i + 1) }).where(and(eq(activities.orgId, orgId), eq(activities.id, ids[i]!))); } }
+        from.splice(from.indexOf(activityId), 1);
+        await tx.update(activities).set({ moduleId: targetModuleId, parentActivityId: targetParentActivityId, seq: -(to.length + 1) }).where(and(eq(activities.orgId, orgId), eq(activities.id, activityId)));
+        to.splice(position, 0, activityId);
+        for (const ids of [from, to]) { for (let i = 0; i < ids.length; i++) { await tx.update(activities).set({ seq: i }).where(and(eq(activities.orgId, orgId), eq(activities.id, ids[i]!))); } }
+        return this.listModules(tx, orgId, courseId);
+      }
       if (moduleId === targetModuleId) {throw new ConflictError("Choose a different module");}
       const rows = await tx
         .select({ id: activities.id, moduleId: activities.moduleId })
@@ -750,6 +789,7 @@ export class DrizzleContentRepository implements ContentRepository {
             eq(activities.orgId, orgId),
             eq(activities.courseId, courseId),
             inArray(activities.moduleId, moduleIds),
+            isNull(activities.parentActivityId),
           ),
         )
         .orderBy(asc(activities.seq))
@@ -772,6 +812,7 @@ export class DrizzleContentRepository implements ContentRepository {
         .update(activities)
         .set({ moduleId: targetModuleId, seq: -(to.length + 1) })
         .where(and(eq(activities.orgId, orgId), eq(activities.id, activityId)));
+      await tx.update(activities).set({ moduleId: targetModuleId }).where(and(eq(activities.orgId, orgId), eq(activities.parentActivityId, activityId)));
       to.splice(position, 0, activityId);
       for (const ids of [from, to]) {
         for (let i = 0; i < ids.length; i++)
@@ -828,10 +869,16 @@ export class DrizzleContentRepository implements ContentRepository {
         }
         savedId = activityId;
       } else {
+        const parentActivityId = input.parentActivityId ?? null;
+        if (parentActivityId) {
+          const [parent] = await tx.select({ id: activities.id }).from(activities).where(and(eq(activities.orgId, orgId), eq(activities.id, parentActivityId), eq(activities.courseId, courseId), eq(activities.moduleId, moduleId), isNull(activities.parentActivityId))).for("update");
+          if (!parent) { throw new NotFoundError("Activity", parentActivityId); }
+        }
+        const scope = parentActivityId ? eq(activities.parentActivityId, parentActivityId) : isNull(activities.parentActivityId);
         const existing = await tx
           .select({ seq: activities.seq })
           .from(activities)
-          .where(and(eq(activities.orgId, orgId), eq(activities.moduleId, moduleId)));
+          .where(and(eq(activities.orgId, orgId), eq(activities.moduleId, moduleId), scope));
         const nextSeq = existing.reduce((max, r) => Math.max(max, r.seq), -1) + 1;
 
         const [ins] = await tx
@@ -840,6 +887,7 @@ export class DrizzleContentRepository implements ContentRepository {
             orgId,
             moduleId,
             courseId,
+            parentActivityId,
             seq: nextSeq,
             settings: input.settings ?? null,
             ...(input.publishedAt !== undefined

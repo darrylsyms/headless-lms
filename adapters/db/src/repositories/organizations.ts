@@ -44,6 +44,11 @@ export class DrizzleOrganizationsRepository implements OrganizationsRepository {
     private readonly logger: Logger = noopLogger,
   ) {}
 
+  async firstOrganizationIds(): Promise<string[]> {
+    const rows = await this.db.select({ id: organizations.id }).from(organizations).limit(2);
+    return rows.map(row => row.id);
+  }
+
   async create(input: NewOrganizationRow): Promise<Organization> {
     const [row] = await this.db
       .insert(organizations)

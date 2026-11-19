@@ -1,5 +1,5 @@
 const localOrigin = "http://localhost:3020";
-const allowedPaths = ["/dashboard", "/courses", "/songs", "/insider", "/my-list", "/community", "/practice-lab"];
+const allowedPaths = ["/dashboard", "/courses", "/songs", "/insider", "/my-list", "/community", "/practice-lab", "/notifications", "/profile", "/members", "/help"];
 const invalidCharacters = (input: string) => [...input].some((char) => char === "\\" || char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127);
 
 export function localReturnDestination(input: string | null): string {

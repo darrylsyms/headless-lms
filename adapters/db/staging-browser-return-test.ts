@@ -4,6 +4,9 @@ import { localReturnDestination, localStudentReturnDestination } from "./staging
 assert.equal(localReturnDestination(null), "http://localhost:3020/dashboard");
 assert.equal(localReturnDestination("/community?view=spaces"), "http://localhost:3020/community?view=spaces");
 assert.equal(localReturnDestination("/courses/example"), "http://localhost:3020/courses/example");
+for (const path of ["/notifications", "/profile", "/members/member-id", "/help"]) {
+  assert.equal(localReturnDestination(path), `http://localhost:3020${path}`);
+}
 for (const destination of ["https://example.com/", "//example.com/", "/\\example.com", "/%2e%2e/admin", "/dashboard#fragment", "/other"]) {
   assert.throws(() => localReturnDestination(destination));
 }

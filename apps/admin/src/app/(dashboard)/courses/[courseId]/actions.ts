@@ -72,9 +72,10 @@ export async function reorderActivitiesAction(
   courseId: string,
   moduleId: string,
   orderedIds: string[],
+  parentActivityId?: string,
 ): Promise<Module[]> {
   const modules = await Content.reorderActivities(
-    { courseId, moduleId, orderedIds },
+    { courseId, moduleId, orderedIds, parentActivityId },
     await authHeaders(),
   );
   revalidateBuilder();
@@ -87,9 +88,10 @@ export async function moveActivityAction(
   activityId: string,
   targetModuleId: string,
   position: number,
+  targetParentActivityId?: string,
 ): Promise<Module[]> {
   const modules = await Content.moveActivity(
-    { courseId, moduleId, activityId, targetModuleId, position },
+    { courseId, moduleId, activityId, targetModuleId, position, targetParentActivityId },
     await authHeaders(),
   );
   revalidateBuilder();
@@ -102,7 +104,7 @@ export async function saveActivityAction(
   activity: SaveActivityInput,
 ): Promise<Module[]> {
   // Activities are uniform: the body is just the opaque settings + assets.
-  const body = { settings: activity.settings as JsonValueInput, assetIds: activity.assetIds };
+  const body = { settings: activity.settings as JsonValueInput, assetIds: activity.assetIds, parentActivityId: activity.parentActivityId };
   const modules = activity.id
     ? await Content.updateActivity(
         { courseId, moduleId, activityId: activity.id, ...body },
@@ -253,9 +255,11 @@ export async function duplicateCourseAction(courseId: string): Promise<Course> {
     copiedModuleIds.add(newModule.id);
 
     const moduleActivities = activities
-      .filter((a) => a.moduleId === mod.id)
+      .filter((a) => a.moduleId === mod.id && !a.parentActivityId)
       .sort((a, b) => a.seq - b.seq);
     for (const activity of moduleActivities) {
+      const topics = activities.filter((a) => a.parentActivityId === activity.id).sort((a, b) => a.seq - b.seq);
+      const before = topics.length ? new Set((await Content.listActivities({ courseId: copy.id }, headers)).map((a) => a.id)) : null;
       const assetIds = links.filter((l) => l.activityId === activity.id).map((l) => l.assetId);
       const original = (activity.settings ?? {}) as ActivitySettings;
       const settings: ActivitySettings = { ...original, published: activityPublished(original) };
@@ -268,6 +272,16 @@ export async function duplicateCourseAction(courseId: string): Promise<Course> {
         },
         headers,
       );
+      if (before) {
+        const createdActivities = await Content.listActivities({ courseId: copy.id }, headers);
+        const matches = createdActivities.filter((a) => a.moduleId === newModule.id && !a.parentActivityId && !before.has(a.id));
+        if (matches.length !== 1) throw new Error("Couldn't resolve the duplicated activity");
+        for (const topic of topics) {
+          const topicSettings = (topic.settings ?? {}) as ActivitySettings;
+          const copiedSettings: ActivitySettings = { ...topicSettings, published: activityPublished(topicSettings) };
+          await Content.createActivity({ courseId: copy.id, moduleId: newModule.id, parentActivityId: matches[0].id, settings: copiedSettings as JsonValueInput, assetIds: links.filter((l) => l.activityId === topic.id).map((l) => l.assetId) }, headers);
+        }
+      }
     }
   }
 
@@ -295,7 +309,7 @@ export async function updateCourseSettingsAction(
 /** Edit course details (title / category / description) from the builder sheet. */
 export async function updateCourseDetailsAction(
   courseId: string,
-  patch: { title: string; category: string; difficulty: Course["difficulty"]; description: string; publishedAt?: string; scheduledAt?: string | null },
+  patch: { title: string; category: string; difficulty: Course["difficulty"]; description?: string; publishedAt?: string; scheduledAt?: string | null },
 ): Promise<Course> {
   const course = await Content.updateCourse(
     {

@@ -96,6 +96,7 @@ export function emailParams(notification: StoredNotification): Record<string, Js
 
 export function emailChannel(deps: {
   mailer: Pick<Mailer, 'send'>;
+  mailerForOrg?: (orgId: string) => Promise<Pick<Mailer, 'send'>>;
   types: NotificationTypeRegistry;
   emailOf: (orgId: string, userId: string) => Promise<string | null>;
 }): NotificationChannel {
@@ -119,7 +120,8 @@ export function emailChannel(deps: {
         };
       }
       try {
-        await deps.mailer.send(
+        const mailer = deps.mailerForOrg ? await deps.mailerForOrg(notification.orgId) : deps.mailer;
+        await mailer.send(
           to.email,
           template,
           emailParams(notification) as unknown as EmailTemplateParams[typeof template],
@@ -206,6 +208,7 @@ export function buildNotificationRegistries(deps: {
   declarations: NotificationTypeDeclaration[];
   defaults: { community: NotificationCategory[]; org: NotificationCategory[] };
   mailer: Pick<Mailer, 'send'> | null;
+  mailerForOrg?: (orgId: string) => Promise<Pick<Mailer, 'send'>>;
   emailOf: (orgId: string, userId: string) => Promise<string | null>;
   push: { sender: PushSender; activeDevices: ActiveDevices } | null;
   channels: NotificationChannel[];
@@ -218,7 +221,7 @@ export function buildNotificationRegistries(deps: {
   ];
   const types = buildNotificationTypeRegistry(deps.declarations, deps.defaults, configured);
   const channels = buildChannelRegistry([
-    ...(deps.mailer ? [emailChannel({ mailer: deps.mailer, types, emailOf: deps.emailOf })] : []),
+    ...(deps.mailer ? [emailChannel({ mailer: deps.mailer, mailerForOrg: deps.mailerForOrg, types, emailOf: deps.emailOf })] : []),
     ...(deps.push ? [pushChannel({ ...deps.push, types })] : []),
     ...deps.channels,
   ]);
