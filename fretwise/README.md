@@ -2,7 +2,7 @@
 
 > Current cross-repository status and next steps are in `fretwise-lms-frontend/docs/handoff.md`. This README also contains setup details and historical notes.
 
-This repository is based on the upstream Headless LMS source, retained under its MIT license. It is a local evaluation environment, not a production service. The `upstream` Git remote points to the original project; no Fretwise remote has been configured.
+This repository is based on the upstream Headless LMS source, retained under its MIT license. It is a local evaluation environment, not a production service. The `upstream` Git remote points to the original project; `origin` is the Fretwise fork. Check current remotes and branch before pushing, and never push Fretwise work to upstream.
 
 ## Start
 
@@ -10,7 +10,7 @@ From the repository root, run `./fretwise/start-local.sh`. Open the admin at htt
 
 This initial machine setup uses Homebrew PostgreSQL on port 8005 and local, ignored credentials in `.env`. Its database files and captured test emails are in `tmp/`; they are not in Git. Keep them private. This setup is specific to this machine. For a fresh installation see the upstream README and self-hosting documentation. Do not use real customer information here.
 
-The local test uses MinIO for object storage; `start-local.sh` starts it on loopback when storage credentials are configured in `.env`. Install the Homebrew `minio` formula if the binary is unavailable. Data, configuration and logs live under `tmp/` and are ignored by Git; `./fretwise/stop-storage.sh` stops this instance. These local files and credentials need a backup before deleting the checkout or changing machines. Outgoing email is not configured; test emails are written to `tmp/emails`. Docker is not installed on this machine.
+The local test uses MinIO for object storage; `start-local.sh` starts it on loopback when storage credentials are configured in `.env`. Install the Homebrew `minio` formula if the binary is unavailable. Data, configuration and logs live under `tmp/` and are ignored by Git; `./fretwise/stop-storage.sh` stops this instance. These local files and credentials need a backup before deleting the checkout or changing machines. A local email sink can write test emails to `tmp/emails`; the platform also has an SES integration, but production configuration and a real delivery test remain outstanding. See the frontend's `docs/amazon-ses-support.md` for which email paths use each transport. Docker is not required for this local setup.
 
 ## Initial Fretwise evaluation (historical)
 

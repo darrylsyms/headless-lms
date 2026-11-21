@@ -2,6 +2,7 @@
 import { and, asc, desc, eq, exists, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
 import { union } from "drizzle-orm/pg-core";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { DELETED_AUTHOR_USER_ID } from "../deleted-author.js";
 import type {
   AdminReportRepository,
   CommunityAnalytics,
@@ -78,6 +79,7 @@ function invitedAs(roleKey: string): SQL {
 
 function isStudent(memberRoleKey: string): SQL {
   return and(
+    sql`${orgUsers.userId} <> ${DELETED_AUTHOR_USER_ID}`,
     hasNoOrgRole(),
     or(
       eq(orgUsers.status, "active"),
@@ -547,7 +549,7 @@ export class DrizzleAdminRepository implements AdminReportRepository {
       )
       .innerJoin(users, eq(users.id, orgUsers.userId))
       .leftJoin(user, eq(user.id, users.externalId))
-      .where(and(eq(orgUsers.orgId, orgId), eq(orgUsers.id, id)))
+      .where(and(eq(orgUsers.orgId, orgId), eq(orgUsers.id, id), sql`${orgUsers.userId} <> ${DELETED_AUTHOR_USER_ID}`))
       .groupBy(
         orgUsers.orgId,
         orgUsers.id,

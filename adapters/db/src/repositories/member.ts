@@ -22,6 +22,7 @@ import type { Logger } from "@headless-lms/core/shared/ports";
 import { noopLogger } from "@headless-lms/core/shared/logger";
 import { translateDbErrors } from "./pg-errors.js";
 import { DrizzleAdminRepository } from "./admin.js";
+import { DELETED_AUTHOR_USER_ID } from "../deleted-author.js";
 import { communityMember, communityPublished, oneOf } from "./grant-covers.js";
 import {
   directEventGrantIds,
@@ -88,6 +89,7 @@ export class DrizzleMemberRepository implements MemberReportRepository {
     const q = query.search?.trim();
     const where = and(
       eq(orgUsers.orgId, orgId),
+      sql`${orgUsers.userId} <> ${DELETED_AUTHOR_USER_ID}`,
       communityMember(sql`${orgUsers.orgId}`, sql`${orgUsers.id}`, sql`${communityId}`, readerIds),
       q ? ilike(columns.displayName, `%${q}%`) : undefined,
     );
